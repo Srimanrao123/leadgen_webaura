@@ -48,16 +48,32 @@ The login asks for your password and stores only a session token in `~/.config/o
 Change the temporary password later under Supabase → Authentication, or ask the admin to reset it.
 
 ## Team dashboard
-A read-only web page showing the live pipeline, follow-ups due, each person's sends today, and the full history of any lead. Everyone signs in with their own CRM email and password and sees only what the database allows.
+A web page with the live pipeline, targets, leaderboard and lead history. Teammates can also add leads and log contacts there. Everyone signs in with their own CRM email and password and sees only what the database allows.
 
-- **On your own Mac:** run the command below. It writes `Outreach Dashboard.html` to your Desktop and opens it. Bookmark it.
-  ```bash
-  python3 ~/.claude/skills/lead-outreach/scripts/crm.py dashboard --open
-  ```
-- **One link for the whole team (free):** rename that file to `index.html`, go to https://app.netlify.com/drop, and drag the file in. Netlify gives you a link to share.
-  The page contains only the project URL and the publishable key, which are safe to publish because the database rules protect the data. Nobody sees anything without an active CRM login.
-  To update it later, regenerate the file and drag it in again on the same site's **Deploys** page.
-- `?demo` at the end of the URL shows sample data. This is handy for checking the page without signing in.
+### Host it on Vercel (one link for everyone, updates itself on every `git push`)
+1. Sign in at **vercel.com** with your GitHub account → **Add New… → Project** → **Import** the `leadgen_webaura` repo.
+2. On the configure screen, leave the framework as **Other**. The repo's `vercel.json` already sets the build.
+3. Open **Environment Variables** and add these two (copy them from your `.env`):
+   - `SUPABASE_URL` = `https://<your-project>.supabase.co`
+   - `SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_…`
+
+   **Never** add the secret or service_role key. The build refuses it anyway.
+4. Click **Deploy**. Your link looks like `https://leadgen-webaura.vercel.app`. Share it with the team and have them bookmark it, on phones too.
+5. Updating it is automatic: whenever the dashboard changes and you `git push`, Vercel rebuilds in about 30 seconds.
+
+The page contains only the project URL and the publishable key. Those are safe to publish, because the database rules protect the data and nobody sees anything without an active CRM login. Search engines are told not to index it.
+
+Test a build on your Mac with `node scripts/build-dashboard.mjs`. It writes `public/index.html`, which is git-ignored.
+
+Note: Vercel's free **Hobby** plan is meant for non-commercial use. For a sales team, Vercel expects the **Pro** plan. Netlify's free plan is an alternative: the same repo works with build command `node scripts/build-dashboard.mjs` and publish directory `public`.
+
+### Or open it from your own Mac
+```bash
+python3 ~/.claude/skills/lead-outreach/scripts/crm.py dashboard --open
+```
+This writes `Outreach Dashboard.html` to your Desktop.
+
+Add `?demo` to the end of the URL to see sample data without signing in.
 
 ## Keep the free project awake
 Free projects pause after 7 days without activity. Daily outreach keeps it awake. If the team takes a break, open the dashboard once a week or run `crm.py whoami`.

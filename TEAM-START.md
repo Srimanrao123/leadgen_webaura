@@ -42,6 +42,8 @@ python3 ~/Desktop/lead-outreach/scripts/crm.py dashboard --open
 ```
 It puts **Outreach Dashboard.html** on your Desktop. Sign in with the same email and password, and bookmark it.
 
+**Easier:** if the admin shares the team dashboard link (it ends in `.vercel.app`), just open and bookmark that instead. It works on your phone too.
+
 ## 6. Set up the Claude app
 - **Email:** install **Claude in Chrome** and stay signed in to the Gmail you send from (or connect a Gmail connector).
 - **WhatsApp:** Claude app → **Settings → This computer → Computer use**: turn it on. Keep the **WhatsApp desktop app** logged in with the business number.

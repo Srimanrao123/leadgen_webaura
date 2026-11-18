@@ -19,6 +19,7 @@ Then fill in `.env` and run `python3 scripts/crm.py login`.
 | `.env.example` | The settings each person needs (copy it to `.env`, which is git-ignored) |
 | `references/` | How to research, write messages, send safely, use the CRM, and report back (`reports.md`) |
 | `scripts/crm.py` | The CRM helper: check, claim, log, follow-ups, brief, team report, targets, export, dashboard |
+| `vercel.json`, `scripts/build-dashboard.mjs` | Hosting the dashboard on Vercel (settings come from Vercel's environment variables) |
 | `dashboard/quotes.json` | The daily motivation quotes (one per day, the same on the dashboard and in Claude's briefing) |
 | `scripts/build_sheet.py` | An offline spreadsheet builder (fallback only) |
 | `dashboard/index.html` | The team dashboard page (template; `crm.py dashboard` fills in the project) |
