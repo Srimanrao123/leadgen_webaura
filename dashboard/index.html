@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outreach Pipeline</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #16191d; --muted: #5f6873; --line: #e3e6ea; --accent: #1f5fbf;
+  --accent-soft: #e8f0fc; --danger: #b42318; --danger-soft: #fdecea; --ok: #1a7f37; --ok-soft: #e6f4ea;
+  --warn: #9a6700; --warn-soft: #fff4d6; --shadow: 0 1px 2px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --panel: #171b21; --text: #e7eaee; --muted: #9aa4af; --line: #2a3038; --accent: #6ea8fe;
+    --accent-soft: #1b2a40; --danger: #ff8a80; --danger-soft: #3a1d1b; --ok: #6fdc8c; --ok-soft: #173222;
+    --warn: #f2c94c; --warn-soft: #3a3117; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 16px; }
+header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+header h1 { font-size: 20px; margin: 0; flex: 1; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { padding: 14px 16px; }
+.kpi .n { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.kpi.alert .n { color: var(--danger); }
+.grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+.card h2 { font-size: 14px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+.list { padding: 4px 0; }
+.row { display: flex; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: var(--accent-soft); }
+.row .grow { flex: 1; min-width: 0; }
+.ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; white-space: nowrap; background: var(--line); color: var(--text); }
+.s-Claimed, .s-Released { background: var(--line); }
+.s-Contacted { background: var(--accent-soft); color: var(--accent); }
+.s-Replied, .s-Interested, .s-Demo-Scheduled, .s-Proposal-Sent { background: var(--warn-soft); color: var(--warn); }
+.s-Won { background: var(--ok-soft); color: var(--ok); }
+.s-Lost, .s-Not-Interested, .s-Do-Not-Contact, .s-Not-Reachable, .s-Disqualified { background: var(--danger-soft); color: var(--danger); }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.filters input, .filters select { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 10px; }
+.filters input { flex: 1; min-width: 160px; }
+.statusbar { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.statusbar .chip { cursor: pointer; border: 1px solid transparent; }
+.statusbar .chip.on { border-color: currentColor; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; position: sticky; top: 0; background: var(--panel); }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--accent-soft); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.due { color: var(--danger); font-weight: 600; }
+.wa-no { color: var(--danger); text-decoration: line-through; }
+.empty { padding: 24px 16px; color: var(--muted); text-align: center; }
+.login { max-width: 380px; margin: 10vh auto; padding: 24px; }
+.login h1 { margin: 0 0 4px; font-size: 20px; }
+.login label { display: block; margin: 14px 0 4px; font-size: 13px; color: var(--muted); }
+.login input { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 9px 10px; }
+.login .btn { width: 100%; margin-top: 18px; padding: 10px; }
+.err { color: var(--danger); margin-top: 12px; font-size: 13px; white-space: pre-wrap; }
+.drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; transform: translateX(100%); transition: transform .2s ease; }
+.drawer.open { transform: none; }
+.drawer-bg.open { display: block; }
+.drawer .hd { position: sticky; top: 0; background: var(--panel); padding: 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; }
+.drawer .hd h3 { margin: 0; font-size: 18px; flex: 1; }
+.drawer .bd { padding: 16px; }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin-bottom: 16px; }
+.kv div:nth-child(odd) { color: var(--muted); font-size: 13px; }
+.kv a { color: var(--accent); }
+.section { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 20px 0 8px; }
+.tl { border-left: 2px solid var(--line); margin-left: 6px; padding-left: 14px; }
+.tl .ev { position: relative; margin-bottom: 14px; }
+.tl .ev::before { content: ""; position: absolute; left: -20px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.tl .ev.in::before { background: var(--warn); }
+.tl .ev.fail::before { background: var(--danger); }
+.tl .ev.convo::before { background: var(--ok); }
+.tl .meta { font-size: 12px; color: var(--muted); }
+.tl .body { white-space: pre-wrap; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-top: 4px; font-size: 13px; max-height: 220px; overflow: auto; }
+.convo-grid { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; font-size: 13px; margin-top: 6px; }
+.convo-grid div:nth-child(odd) { color: var(--muted); }
+.banner { background: var(--warn-soft); color: var(--warn); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; }
+.hidden { display: none !important; }
+@media (max-width: 640px) { .hide-sm { display: none; } .kv { grid-template-columns: 1fr; } .kv div:nth-child(odd) { margin-top: 6px; } }
+</style>
+</head>
+<body>
+
+<!-- Setup: only shown when the page was not generated with a project URL/key -->
+<div id="setup" class="card login hidden">
+  <h1>Connect to your CRM</h1>
+  <div class="muted small">Project URL and publishable (anon) key from Supabase → Project Settings → API Keys. Never the secret / service_role key.</div>
+  <label for="cfgUrl">Project URL</label><input id="cfgUrl" placeholder="https://abcd1234.supabase.co">
+  <label for="cfgKey">Publishable key</label><input id="cfgKey" placeholder="sb_publishable_…">
+  <button class="btn primary" id="cfgSave">Continue</button>
+  <div class="err" id="cfgErr"></div>
+</div>
+
+<div id="login" class="card login hidden">
+  <h1>Outreach Pipeline</h1>
+  <div class="muted small">Sign in with your CRM email and password.</div>
+  <form id="loginForm">
+    <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+    <button class="btn primary" type="submit">Sign in</button>
+  </form>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app" class="wrap hidden">
+  <header>
+    <h1>Outreach Pipeline</h1>
+    <span class="muted small" id="updated"></span>
+    <button class="btn" id="refreshBtn">Refresh</button>
+    <span class="small" id="who"></span>
+    <button class="btn" id="logoutBtn">Sign out</button>
+  </header>
+  <div id="banner" class="banner hidden"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2><span>Follow-ups due</span><span class="muted small" id="dueCount"></span></h2>
+      <div class="list" id="dueList"></div>
+    </div>
+    <div class="card">
+      <h2><span>Today by person</span><span class="muted small">new companies messaged</span></h2>
+      <div class="list" id="teamList"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span>All leads</span><span class="muted small" id="leadCount"></span></h2>
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search company, city, phone, email…">
+      <select id="fOwner"></select>
+      <select id="fCat"></select>
+    </div>
+    <div class="statusbar" id="statusBar"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Company</th><th>Status</th><th>Owner</th><th class="hide-sm">City</th><th class="num hide-sm">Score</th>
+          <th class="hide-sm">Last touch</th><th>Follow-up</th><th class="num hide-sm">Sent / In</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty hidden" id="emptyTable">No leads match these filters.</div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-bg" id="drawerBg"></div>
+<aside class="drawer" id="drawer" aria-label="Lead details">
+  <div class="hd"><h3 id="dTitle"></h3><button class="btn" id="dClose">Close</button></div>
+  <div class="bd" id="dBody"></div>
+</aside>
+
+<script>
+/*CONFIG*/const CONFIG = {"url": "", "key": ""};/*END CONFIG*/
+
+const ACTIVE = ["Contacted", "Replied", "Interested", "Demo Scheduled", "Proposal Sent"];
+const STATUS_ORDER = ["Claimed", "Contacted", "Replied", "Interested", "Demo Scheduled", "Proposal Sent", "Won",
+  "Lost", "Not Interested", "Not Reachable", "Disqualified", "Released", "Do Not Contact"];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const todayIST = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+const fmtDate = (d) => d ? new Date(d.length === 10 ? d + "T00:00:00+05:30" : d).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }) : "";
+const fmtTime = (d) => d ? new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }) : "";
+const cls = (s) => "s-" + String(s ?? "").replace(/[^A-Za-z]+/g, "-");
+const chip = (s) => `<span class="chip ${cls(s)}">${esc(s)}</span>`;
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+                set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+
+let sb, me, team = [], leads = [], today = [], filterStatus = null, refreshTimer;
+
+// ---------------------------------------------------------------- boot
+function show(id) { for (const x of ["setup", "login", "app"]) $(x).classList.toggle("hidden", x !== id); }
+
+function getConfig() {
+  if (CONFIG.url && CONFIG.key) return CONFIG;
+  const url = store.get("crm_url"), key = store.get("crm_key");
+  return url && key ? { url, key } : null;
+}
+
+async function boot() {
+  if (new URLSearchParams(location.search).has("demo")) return loadDemo();
+  const cfg = getConfig();
+  if (!cfg) return show("setup");
+  if (!window.supabase) { show("login"); $("loginErr").textContent = "Could not load the Supabase library. Check your internet connection and reload."; return; }
+  sb = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, storageKey: "outreach-crm-auth" } });
+  const { data } = await sb.auth.getSession();
+  if (data.session) return start(data.session.user);
+  show("login");
+}
+
+$("cfgSave").onclick = () => {
+  const url = $("cfgUrl").value.trim().replace(/\/+$/, ""), key = $("cfgKey").value.trim();
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(url)) { $("cfgErr").textContent = "URL should look like https://abcd1234.supabase.co"; return; }
+  if (!key || /service_role|sb_secret_/.test(key)) { $("cfgErr").textContent = "Use the publishable (anon) key, never the secret key."; return; }
+  store.set("crm_url", url); store.set("crm_key", key); boot();
+};
+
+$("loginForm").onsubmit = async (e) => {
+  e.preventDefault();
+  $("loginErr").textContent = "";
+  const { data, error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+  $("password").value = "";
+  if (error) { $("loginErr").textContent = error.message; return; }
+  start(data.user);
+};
+
+$("logoutBtn").onclick = async () => { clearInterval(refreshTimer); if (sb) await sb.auth.signOut(); location.reload(); };
+$("refreshBtn").onclick = () => load();
+
+async function start(user) {
+  const { data, error } = await sb.from("team").select("id,name,active,is_admin").eq("id", user.id).maybeSingle();
+  if (error || !data || !data.active) {
+    show("login");
+    $("loginErr").textContent = error ? error.message : "Your account is not active yet. Ask the admin to activate you.";
+    await sb.auth.signOut();
+    return;
+  }
+  me = data;
+  $("who").innerHTML = `<b>${esc(me.name)}</b>${me.is_admin ? ' <span class="muted">(admin)</span>' : ""}`;
+  show("app");
+  await load();
+  refreshTimer = setInterval(load, 60000);
+}
+
+// ---------------------------------------------------------------- data
+async function load() {
+  const since = todayIST() + "T00:00:00+05:30";
+  const [t, p, d] = await Promise.all([
+    sb.from("team").select("id,name,active,daily_limit").order("name"),
+    sb.from("pipeline").select("*").order("id"),
+    sb.from("touches").select("lead_id,member_id,channel,direction,result,occurred_at").gte("occurred_at", since).eq("direction", "out"),
+  ]);
+  const err = t.error || p.error || d.error;
+  if (err) { banner(`Could not load data: ${err.message}`); return; }
+  banner("");
+  team = t.data; leads = p.data; today = d.data;
+  render();
+  $("updated").textContent = "Updated " + new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+}
+
+function banner(msg) { $("banner").textContent = msg; $("banner").classList.toggle("hidden", !msg); }
+
+// ---------------------------------------------------------------- render
+function render() {
+  const t = todayIST();
+  const due = leads.filter((l) => !l.dnc && l.next_followup && l.next_followup <= t && ACTIVE.includes(l.status))
+                   .sort((a, b) => a.next_followup.localeCompare(b.next_followup));
+  const count = (pred) => leads.filter(pred).length;
+  const sentToday = new Set(today.filter((x) => ["sent", "delivered", "read"].includes(x.result)).map((x) => x.lead_id)).size;
+  const kpis = [
+    ["Leads", leads.length],
+    ["Contacted", count((l) => l.messages_sent > 0)],
+    ["Replied", count((l) => ["Replied", "Interested", "Demo Scheduled", "Proposal Sent", "Won"].includes(l.status))],
+    ["Interested+", count((l) => ["Interested", "Demo Scheduled", "Proposal Sent", "Won"].includes(l.status))],
+    ["Won", count((l) => l.status === "Won")],
+    ["Due now", due.length, due.length > 0],
+    ["Messaged today", sentToday],
+  ];
+  $("kpis").innerHTML = kpis.map(([l, n, alert]) => `<div class="card kpi${alert ? " alert" : ""}"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`).join("");
+
+  $("dueCount").textContent = due.length ? `${due.length} due` : "";
+  $("dueList").innerHTML = due.length ? due.map((l) => `
+    <div class="row" data-id="${l.id}">
+      <div class="grow"><div class="ellipsis"><b>${esc(l.company)}</b></div>
+        <div class="muted small ellipsis">${esc(l.owner_name || "Unowned")} · last touch ${esc(fmtTime(l.last_touch_at) || "never")}</div></div>
+      ${chip(l.status)}<span class="small ${l.next_followup < t ? "due" : ""}">${esc(fmtDate(l.next_followup))}</span>
+    </div>`).join("") : `<div class="empty">Nothing due. Nice.</div>`;
+
+  const perMember = team.filter((m) => m.active).map((m) => {
+    const mine = today.filter((x) => x.member_id === m.id && ["sent", "delivered", "read"].includes(x.result));
+    const by = (ch) => new Set(mine.filter((x) => x.channel === ch).map((x) => x.lead_id)).size;
+    return { m, wa: by("whatsapp"), em: by("email"), owned: leads.filter((l) => l.owner_id === m.id).length };
+  });
+  $("teamList").innerHTML = perMember.length ? perMember.map(({ m, wa, em, owned }) => `
+    <div class="row" data-owner="${esc(m.id)}">
+      <div class="grow"><b>${esc(m.name)}</b><div class="muted small">${owned} leads owned</div></div>
+      <span class="small ${wa > m.daily_limit ? "due" : ""}">WA ${wa}/${m.daily_limit}</span>
+      <span class="small ${em > m.daily_limit ? "due" : ""}">Email ${em}/${m.daily_limit}</span>
+    </div>`).join("") : `<div class="empty">No active teammates.</div>`;
+
+  // filters
+  const ownerSel = $("fOwner"), keepOwner = ownerSel.value;
+  ownerSel.innerHTML = `<option value="">All owners</option><option value="__me">Mine</option><option value="__none">Unowned</option>` +
+    team.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("");
+  ownerSel.value = keepOwner;
+  const catSel = $("fCat"), keepCat = catSel.value;
+  const cats = [...new Set(leads.map((l) => l.category).filter(Boolean))].sort();
+  catSel.innerHTML = `<option value="">All categories</option>` + cats.map((c) => `<option>${esc(c)}</option>`).join("");
+  catSel.value = keepCat;
+  renderTable();
+}
+
+function filtered(ignoreStatus) {
+  const q = $("q").value.trim().toLowerCase(), owner = $("fOwner").value, cat = $("fCat").value;
+  const qDigits = q.replace(/\D/g, "");
+  return leads.filter((l) => {
+    if (!ignoreStatus && filterStatus && l.status !== filterStatus) return false;
+    if (owner === "__me" && l.owner_id !== me.id) return false;
+    if (owner === "__none" && l.owner_id) return false;
+    if (owner && !owner.startsWith("__") && l.owner_id !== owner) return false;
+    if (cat && l.category !== cat) return false;
+    if (q) {
+      const hay = [l.company, l.city, l.area, l.segment, l.website, l.owner_name, ...(l.contacts || []).map((c) => c.value)].join(" ").toLowerCase();
+      if (!hay.includes(q) && !(qDigits.length >= 4 && hay.replace(/\s/g, "").includes(qDigits))) return false;
+    }
+    return true;
+  });
+}
+
+function renderTable() {
+  const base = filtered(true);
+  const counts = {};
+  base.forEach((l) => (counts[l.status] = (counts[l.status] || 0) + 1));
+  $("statusBar").innerHTML = `<span class="chip ${filterStatus ? "" : "on"}" data-status="">All ${base.length}</span>` +
+    STATUS_ORDER.filter((s) => counts[s]).map((s) => `<span class="chip ${cls(s)} ${filterStatus === s ? "on" : ""}" data-status="${esc(s)}">${esc(s)} ${counts[s]}</span>`).join("");
+  // Hottest first: deals in progress, then replies, contacted, claimed, and closed/dead at the bottom.
+  const SORT = ["Proposal Sent", "Demo Scheduled", "Interested", "Replied", "Contacted", "Claimed", "Released", "Won",
+    "Not Reachable", "Lost", "Not Interested", "Disqualified", "Do Not Contact"];
+  const rank = (s) => { const i = SORT.indexOf(s); return i < 0 ? SORT.length : i; };
+  const rows = filtered(false).sort((a, b) => (rank(a.status) - rank(b.status)) || ((b.score || 0) - (a.score || 0)));
+  const t = todayIST();
+  $("leadCount").textContent = `${rows.length} of ${leads.length}`;
+  $("tbody").innerHTML = rows.map((l) => `
+    <tr data-id="${l.id}">
+      <td><b>${esc(l.company)}</b>${l.dnc ? ' <span class="chip s-Do-Not-Contact">DNC</span>' : ""}<div class="muted small">${esc(l.segment || l.category || "")}</div></td>
+      <td>${chip(l.status)}</td>
+      <td>${esc(l.owner_name || "—")}</td>
+      <td class="hide-sm">${esc(l.city || "")}</td>
+      <td class="num hide-sm">${l.score ?? ""}</td>
+      <td class="hide-sm small">${esc(fmtTime(l.last_touch_at))}</td>
+      <td class="small ${l.next_followup && l.next_followup <= t && ACTIVE.includes(l.status) && !l.dnc ? "due" : ""}">${esc(fmtDate(l.next_followup))}</td>
+      <td class="num hide-sm">${l.messages_sent} / ${l.messages_received}</td>
+    </tr>`).join("");
+  $("emptyTable").classList.toggle("hidden", rows.length > 0);
+}
+
+$("q").oninput = renderTable;
+$("fOwner").onchange = renderTable;
+$("fCat").onchange = renderTable;
+$("statusBar").onclick = (e) => { const c = e.target.closest("[data-status]"); if (!c) return; filterStatus = c.dataset.status || null; renderTable(); };
+$("teamList").onclick = (e) => { const r = e.target.closest("[data-owner]"); if (!r) return; $("fOwner").value = r.dataset.owner; renderTable(); $("tbody").scrollIntoView({ behavior: "smooth" }); };
+document.addEventListener("click", (e) => { const r = e.target.closest("[data-id]"); if (r && !e.target.closest(".drawer")) openLead(+r.dataset.id); });
+
+// ---------------------------------------------------------------- lead drawer
+async function openLead(id) {
+  const l = leads.find((x) => x.id === id);
+  if (!l) return;
+  $("dTitle").innerHTML = `${esc(l.company)} ${chip(l.status)}`;
+  $("dBody").innerHTML = `<div class="muted">Loading…</div>`;
+  $("drawer").classList.add("open"); $("drawerBg").classList.add("open");
+  let touches, convos;
+  if (sb) {
+    const [t, c] = await Promise.all([
+      sb.from("touches").select("occurred_at,channel,direction,contact_value,result,subject,body,team(name)").eq("lead_id", id).order("occurred_at"),
+      sb.from("conversations").select("*,team(name)").eq("lead_id", id).order("occurred_at"),
+    ]);
+    if (t.error || c.error) { $("dBody").innerHTML = `<div class="err">${esc((t.error || c.error).message)}</div>`; return; }
+    touches = t.data; convos = c.data;
+  } else { touches = DEMO.touches[id] || []; convos = DEMO.convos[id] || []; }
+
+  const site = l.website ? (/^https?:/i.test(l.website) ? l.website : "https://" + l.website) : "";
+  const contacts = (l.contacts || []).filter((c) => c.kind !== "domain").map((c) =>
+    `<div class="${c.whatsapp === "not_on_whatsapp" ? "wa-no" : ""}">${esc(c.kind)}: ${esc(c.value)}${c.label ? ` <span class="muted">(${esc(c.label)})</span>` : ""}${c.whatsapp === "on_whatsapp" ? " ✓ WhatsApp" : c.whatsapp === "not_on_whatsapp" ? " · not on WhatsApp" : ""}</div>`).join("");
+  const kv = [
+    ["Owner", esc(l.owner_name || "Unowned")], ["Category", esc([l.category, l.segment].filter(Boolean).join(" · "))],
+    ["City", esc([l.area, l.city].filter(Boolean).join(", "))], ["Website", site ? `<a href="${esc(site)}" target="_blank" rel="noopener">${esc(l.website)}</a>` : ""],
+    ["Contact person", esc(l.contact_person || "")], ["Contacts", contacts], ["Score", l.score ?? ""],
+    ["Next follow-up", esc(fmtDate(l.next_followup))], ["Claimed", esc(fmtDate(l.claimed_at))],
+    ["Do not contact", l.dnc ? `<span class="due">Yes — ${esc(l.dnc_reason || "")}</span>` : ""], ["Notes", esc(l.notes || "")],
+  ].filter(([, v]) => v !== "" && v != null);
+
+  const events = [
+    ...touches.map((t) => ({ at: t.occurred_at, kind: "touch", t })),
+    ...convos.map((c) => ({ at: c.occurred_at, kind: "convo", c })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+
+  const tl = events.map((e) => {
+    if (e.kind === "touch") {
+      const t = e.t, fail = ["failed", "bounced", "not_on_whatsapp", "no_answer", "wrong_number"].includes(t.result);
+      const who = t.direction === "out" ? `${esc(t.team?.name || "")} → ${esc(t.contact_value || "")}` : `from ${esc(t.contact_value || "lead")}`;
+      return `<div class="ev ${t.direction === "in" ? "in" : ""} ${fail ? "fail" : ""}">
+        <div><b>${t.direction === "out" ? "Sent" : "Received"}</b> · ${esc(t.channel)} · <span class="muted">${esc(t.result.replace(/_/g, " "))}</span></div>
+        <div class="meta">${esc(fmtTime(t.at || e.at))} · ${who}</div>
+        ${t.subject ? `<div class="small"><b>${esc(t.subject)}</b></div>` : ""}
+        ${t.body ? `<div class="body">${esc(t.body)}</div>` : ""}</div>`;
+    }
+    const c = e.c;
+    const fields = [["Current tools", c.current_tools], ["Pain points", c.pain_points], ["Budget / timing", c.budget_timeline],
+      ["Objections", c.objections], ["We promised", c.promised], ["Next step", c.next_step], ["Follow-up", fmtDate(c.next_followup)]]
+      .filter(([, v]) => v).map(([k, v]) => `<div>${esc(k)}</div><div>${esc(v)}</div>`).join("");
+    return `<div class="ev convo">
+      <div><b>${esc(c.kind.replace(/_/g, " "))}</b>${c.outcome ? ` · <span class="muted">${esc(c.outcome)}</span>` : ""}${c.duration_min ? ` · ${c.duration_min} min` : ""}</div>
+      <div class="meta">${esc(fmtTime(c.occurred_at))} · ${esc(c.team?.name || "")}${c.contact_person ? " with " + esc(c.contact_person) : ""}</div>
+      <div class="body">${esc(c.summary)}</div>
+      ${fields ? `<div class="convo-grid">${fields}</div>` : ""}
+      ${c.transcript ? `<details><summary class="small">Transcript</summary><div class="body">${esc(c.transcript)}</div></details>` : ""}</div>`;
+  }).join("");
+
+  $("dBody").innerHTML = `
+    <div class="kv">${kv.map(([k, v]) => `<div>${esc(k)}</div><div>${v}</div>`).join("")}</div>
+    ${l.findings ? `<div class="section">Research findings</div><div class="small" style="white-space:pre-wrap">${esc(l.findings)}</div>` : ""}
+    <div class="section">History (${events.length})</div>
+    ${events.length ? `<div class="tl">${tl}</div>` : `<div class="muted">No messages or calls logged yet.</div>`}`;
+}
+function closeLead() { $("drawer").classList.remove("open"); $("drawerBg").classList.remove("open"); }
+$("dClose").onclick = closeLead; $("drawerBg").onclick = closeLead;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeLead(); });
+
+// ---------------------------------------------------------------- demo mode (?demo) — sample data, no network
+let DEMO;
+function loadDemo() {
+  const t = todayIST(), now = new Date().toISOString();
+  me = { id: "u1", name: "Sriman", is_admin: true };
+  team = [{ id: "u1", name: "Sriman", active: true, daily_limit: 20 }, { id: "u2", name: "Ravi", active: true, daily_limit: 20 }];
+  const L = (id, company, status, owner, extra = {}) => ({ id, company, status, owner_id: owner, owner_name: owner === "u1" ? "Sriman" : owner === "u2" ? "Ravi" : null,
+    category: "construction", city: "Hyderabad", score: 70, messages_sent: 1, messages_received: 0, dnc: false, last_touch_at: now, next_followup: null, contacts: [], ...extra });
+  leads = [
+    L(1, "Sample Builders", "Interested", "u1", { next_followup: t, messages_received: 1, contacts: [{ kind: "phone", value: "919000000001", whatsapp: "on_whatsapp" }] }),
+    L(2, "Example Homes", "Contacted", "u2", { next_followup: "2099-01-01" }),
+    L(3, "Demo Infra <b>x</b>", "Claimed", "u1", { messages_sent: 0, contacts: [{ kind: "phone", value: "919000000003", whatsapp: "not_on_whatsapp" }] }),
+    L(4, "Test Constructions", "Do Not Contact", "u2", { dnc: true, dnc_reason: "Asked to stop" }),
+  ];
+  today = [{ lead_id: 1, member_id: "u1", channel: "whatsapp", direction: "out", result: "sent" }];
+  DEMO = { touches: { 1: [{ occurred_at: now, channel: "whatsapp", direction: "out", result: "sent", contact_value: "919000000001", body: "Hi team,\n\nSample message.", team: { name: "Sriman" } },
+                          { occurred_at: now, channel: "whatsapp", direction: "in", result: "replied", contact_value: "919000000001", body: "Hi sure" }] },
+           convos: { 1: [{ occurred_at: now, kind: "call", outcome: "positive", summary: "Sample call summary.", current_tools: "Excel + WhatsApp", next_step: "Send demo", next_followup: t, team: { name: "Sriman" } }] } };
+  $("who").innerHTML = "<b>Demo data</b>";
+  $("logoutBtn").classList.add("hidden"); $("refreshBtn").classList.add("hidden");
+  show("app"); render(); banner("Demo mode: sample data, not your CRM.");
+}
+
+boot();
+</script>
+</body>
+</html>

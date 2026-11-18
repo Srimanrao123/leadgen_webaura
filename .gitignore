@@ -1,0 +1,17 @@
+# Private settings
+.env
+.env.*
+!.env.example
+
+# Generated output (lead sheets, dashboards with your project filled in, test files)
+*.xlsx
+*.csv
+Outreach Dashboard.html
+leads*.json
+msg*.txt
+convo*.json
+
+# Python / OS
+__pycache__/
+*.pyc
+.DS_Store
