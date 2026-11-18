@@ -4,6 +4,8 @@ This skill lets Claude find leads, write personal outreach messages, send them b
 
 You need about 10 minutes once.
 
+**Shortcut:** open Claude and say *"Set me up for lead outreach using <REPO_URL> and its TEAM-START.md"*. Claude does the steps below. You only type your password at the sign-in step, and you add the details the admin sends you.
+
 ## 1. Get your login from the admin
 The admin adds you in Supabase and activates you. You get an **email**, a **temporary password**, and the **project URL + publishable key** to put in `.env`.
 
@@ -51,19 +53,32 @@ cd ~/Desktop/lead-outreach && git pull
 ```
 Because the skill is linked, Claude uses the new version right away. Your `.env` and login are untouched.
 
-## Use it
-In Claude, say something like:
-> Find 10 builders in Kondapur, Hyderabad and do the outreach for our CRM service.
+## Use it: just talk to Claude
+You never need to update anything yourself. Say it in your own words:
 
-> Find 10 dental clinics in Banjara Hills and do the outreach for our video service.
+| Say | You get |
+|---|---|
+| **"Good morning"** | Your day: target, leaderboard spot, follow-ups due, promises you owe, today's quote and a plan |
+| **"Find 10 builders in Kondapur and do the outreach"** | Research → drafts for your OK → sent → a report with your new score |
+| **"Do my follow-ups"** | Follow-ups drafted from each lead's history → sent after your OK → a report |
+| **"Kamala replied: send me the price"** | Logged, status updated, one-line confirmation |
+| **"Called Marvel, no answer"** | Logged |
+| **"Had a call with BuildHome: …notes…"** | A clean summary saved, and any promise tracked until it's done |
+| **"They said stop messaging"** | Marked Do Not Contact for the whole team |
+| **"How am I doing?"** | Your % of today's target and your rank |
+| **"Check my replies"** | Claude reads your WhatsApp and Gmail for replies from your leads, saves them, and tells you who replied |
+| **"Wrap up my day"** | Today's score, wins, what's still open, and tomorrow's plan |
 
-> Kamala Infra replied "send me the price". Log it.
+Claude checks the CRM first, skips companies a teammate already has, and **always waits for your OK on drafts** before sending. Everything after that (logging, statuses, follow-up dates) happens by itself, and you get a short report at the end.
 
-> I just had a call with BuildHome. Here are my notes: … Log it.
+**Good to know:** replies that come to your phone don't reach Claude by themselves. Say **"check my replies"** once or twice a day, or just tell Claude what they said.
 
-> What follow-ups are due today?
+## Did something without Claude? Add it on the dashboard
+- **Found a company yourself?** Click **＋ Add lead** at the top. Fill in the name and at least a phone, email, website or Instagram. It warns you right away if a teammate already has it. If you've already called or messaged them, tick **"I already contacted them"** and say how.
+- **Called, met or messaged a lead from your phone?** Open the lead → **📞 Log contact**: how (WhatsApp, call, email, in person…), when, the result, and what was said.
+- **Had a proper conversation?** Open the lead → **💬 Add conversation** to save the notes, next step and follow-up date.
 
-Claude checks the CRM first, skips companies a teammate already has, and claims the new ones for you. It shows you the drafts and **waits for your OK** before sending anything, then logs every send automatically.
+All of it counts toward your target and the leaderboard, exactly like Claude's work.
 
 ## Team rules
 - Never message a company owned by someone else. The CRM tells you who owns it.

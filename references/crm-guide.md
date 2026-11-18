@@ -67,6 +67,25 @@ Write this JSON from the user's transcript or notes. Leave a field out when it's
 - `reclaim LEAD_ID`: take an unowned or released lead, or a claim older than 3 days with no outreach. Admins can take any lead.
 - `dnc LEAD_ID "reason"`: anyone can do this. It is permanent unless an admin undoes it.
 
+## Targets, progress and leaderboard
+Each teammate has daily targets for three things, counted per IST day:
+- **New companies:** a company's first-ever message. It counts once even if it went on 2 channels.
+- **Follow-ups:** messages to a company first contacted on an earlier day.
+- **Conversations:** calls, meetings, demos and chat summaries logged with `convo` or the dashboard. "No answer" doesn't count.
+
+Only messages that actually went out count (sent/delivered/read). Failed sends don't.
+
+| Command | What it does |
+|---|---|
+| `progress` | Your targets vs achieved today, what's still pending, and follow-ups due |
+| `progress --all [--day 2026-11-18]` | Everyone, for any day |
+| `leaderboard --period today\|week\|month` | Ranked by points: new contact 1, follow-up 1, conversation 3, reached Interested 5, Demo Scheduled 8, Proposal Sent 10, Won 25 |
+| `target Ravi --new 10 --followups 5 --conversations 2` | (admin) Ravi's default for every day |
+| `target Ravi --new 4 --followups 2 --conversations 1 --day 2026-11-20 --note "Half day"` | (admin) one day only |
+| `target Ravi --day 2026-11-20 --clear` | (admin) remove that day's override |
+
+Several conversations with the same lead at different times are fine. Log each one separately with its own `occurred_at`. The dashboard's lead panel has **+ Add conversation** and **+ Log message** buttons for doing this by hand.
+
 ## Importing an older spreadsheet
 `import-sheet FILE.xlsx --category construction --city Hyderabad --dry-run` shows what would be created. Run it again without `--dry-run` to import.
 

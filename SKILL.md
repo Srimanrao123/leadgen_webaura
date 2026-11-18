@@ -1,6 +1,6 @@
 ---
 name: lead-outreach
-description: Find local business leads in any industry (clinics, builders, restaurants, salons, schools and so on) in an Indian city or area, check the team's shared Supabase CRM so nobody contacts the same company twice, research and score each one, write a personalized outreach message, send it by email and WhatsApp after the user approves, and log every message, reply and call summary in the CRM. Use when the user wants to find leads, prospect businesses, do cold outreach, log a reply or call, see follow-ups or the pipeline, or sell any service (content, video, CRM, automation, websites) to local businesses.
+description: Find local business leads in any industry (clinics, builders, restaurants, salons, schools and so on) in an Indian city or area, check the team's shared Supabase CRM so nobody contacts the same company twice, research and score each one, write a personalized outreach message, send it by email and WhatsApp after the user approves, log every message, reply and call summary in the CRM automatically, and report progress against daily targets and the team leaderboard. Use when the user wants to find leads, prospect businesses, do cold outreach or follow-ups, log a reply or call in plain words, get a morning briefing, day wrap-up or team report, check their target or leaderboard, see the pipeline, or sell any service (content, video, CRM, automation, websites) to local businesses.
 ---
 
 # Outreach: check → claim → understand → score → personalize → send → log
@@ -11,6 +11,17 @@ The goal is a **small number of well-researched leads**, not volume. Every messa
 
 The CRM helper is `scripts/crm.py` (run it with `python3`, from this skill's folder). Command details and the conversation-summary format are in [references/crm-guide.md](references/crm-guide.md).
 
+## Talk-only: the user never does the bookkeeping
+
+Teammates work only by talking to you. Everything that touches the CRM is your job, done automatically as it happens:
+- Claiming leads, logging every send and failure, logging replies and calls they mention, setting statuses and follow-up dates, and recording promises.
+- Never ask them to run a command or update anything by hand. The one exception is the first-time `login`, because it needs their password.
+- **Finish every piece of work with a short report** in the formats in [references/reports.md](references/reports.md): what got done, their progress against today's target, their leaderboard position, what's pending, and one **Next:** suggestion.
+- Understand plain language ("Kamala replied asking for the price", "called Marvel, no answer", "wrap up my day"). The mapping from phrases to actions is in reports.md. Use `crm.py find` to resolve company names.
+- Sending messages to leads still always needs their OK on the drafts. Everything after that OK happens without asking.
+- **Replies that arrive on their phone don't reach you by themselves.** When they say "check my replies", or at the start of a session when follow-ups are due, offer to check: run the replies round in [references/sending-playbook.md](references/sending-playbook.md). It reads WhatsApp and Gmail for their active leads, logs new replies once, updates statuses, and gives a **Replies report**.
+- **Work done without you counts the same.** Teammates can add leads and log calls, visits or messages themselves with the dashboard's **＋ Add lead** and **📞 Log contact**. That goes into the same CRM, so `brief`, `followups` and `check` already include it. Never re-add or re-log it.
+
 ## Step 0: Set up (ask once, at the start)
 
 1. **CRM first:** run `crm.py whoami`.
@@ -18,7 +29,11 @@ The CRM helper is `scripts/crm.py` (run it with `python3`, from this skill's fol
    - If it says "Not signed in", give them `python3 <skill>/scripts/crm.py login` to run **in their own terminal**. Never ask for, type or store their Supabase password, and never write keys into tracked files. Only `.env` holds them, and it's git-ignored.
    - If `active` is false, tell them an admin must activate them.
    - The team row gives the user's name for the sign-off.
-2. Run `crm.py followups` and `crm.py mine --status Replied` / `--status Interested`. If anything is due, show it first and ask whether to handle those before new outreach.
+2. Run `crm.py brief`. It returns their progress, rank, due follow-ups, hot leads, open promises, untouched claims and the quote of the day.
+   - If they opened with a greeting or "what should I do today", give the **Morning briefing** from reports.md.
+   - Otherwise, open with one line on their day, e.g. *"You're at 40% of today's target: 6 more new companies, 2 follow-ups and 1 conversation to go."*
+   - Plan the session to close what's pending: **overdue promises first**, then due follow-ups, then enough new companies to reach the target.
+   - If `progress` in the output carries an error mentioning a missing function, the admin hasn't run `supabase/002_targets_leaderboard.sql` yet. Carry on without targets.
 3. In one AskUserQuestion round or one short message, collect what is still missing:
    - **Who is sending:** the business name for the sign-off, and the email address to send from.
    - **What they sell:** one or two lines about the service.
@@ -93,6 +108,7 @@ Follow [references/sending-playbook.md](references/sending-playbook.md).
   Use `--channel email --to <address> --subject "..."` for email. Log failures too, with `--result not_on_whatsapp` or `--result bounced`.
 
   The CRM sets the status to Contacted and the follow-up to +4 days by itself. If a log call fails, stop and tell the user before sending more.
+- **When the batch is done:** run `crm.py brief` and give the **Outreach report** from reports.md. Don't ask the user to check anything.
 
 ## Step 8: Replies, calls and follow-ups
 
@@ -102,7 +118,14 @@ Follow [references/sending-playbook.md](references/sending-playbook.md).
   - A call recording needs the other person's consent; set `recording_consent` accordingly.
 - **Anyone says stop or not interested:** run `crm.py dnc LEAD_ID "<their words>"` immediately. Nobody on the team can message them again.
 - **The user wants to see the pipeline:** run `crm.py dashboard --open`. It writes the team dashboard page to the Desktop and opens it; they sign in there themselves. Hosting it for the team is covered in [supabase/SETUP.md](supabase/SETUP.md).
-- **Follow-ups:** `crm.py followups` lists what's due. Draft the follow-up, show it, send it only after approval, and log it like any send.
+- **Follow-up round** ("do my follow-ups"):
+  1. Run `crm.py followups`, then `crm.py show LEAD_ID` for each, so every follow-up fits that lead's history (what we sent, what they said, what we promised).
+  2. Draft short follow-ups. Each one adds something new: a useful idea, an answer to their question, or the thing we promised. Never send just "following up".
+  3. Show all the drafts together and send after one OK.
+  4. Log each send.
+  5. Give the **Follow-up report**.
+- **Quick logging** from plain language: `crm.py find NAME` → `touch` or `convo` → `update` the status if it changed → a one- or two-line confirmation, plus progress if a target was just hit. If they mention a promise ("I'll send the quote Friday"), store it in the conversation's `promised` field with `next_followup`. `brief` keeps showing it until a message goes out to that lead.
+- **Day wrap-up** ("wrap up my day") and **team report** ("team report", for the admin): use `brief` / `team-report` and the formats in reports.md. Send a report to anyone (a teammate, a WhatsApp group) only when the user asks and names the recipient.
 
 ## Rules that always hold
 

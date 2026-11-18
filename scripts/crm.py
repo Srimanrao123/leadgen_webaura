@@ -21,6 +21,15 @@ Everyday commands (Claude runs these):
     mine   [--status S]                 my leads
     followups [--all]                   follow-ups due (mine, or the whole team)
     quota                               companies I messaged today per channel
+    progress [--day D] [--all]          my (or everyone's) targets vs achieved, and what's pending
+    leaderboard [--period today|week|month]
+    target NAME --new N --followups N --conversations N [--day D --note T]   (admin) set targets
+    target NAME --day D --clear                                              (admin) remove a day override
+    brief                               my day in one call: progress, rank, due follow-ups, hot leads, promises, quote
+    team-report                         whole team: progress, leaderboard, overdue, stale claims, promises
+    find TEXT                           find a lead by name / phone / email / city
+    quote                               today's motivation quote
+    watchlist                           my active leads: where to look for replies + last sent / last reply logged
     dnc    LEAD_ID "reason"             nobody may contact this lead again
     release LEAD_ID | reclaim LEAD_ID
     export OUT.xlsx [--mine] [--category C]
@@ -410,6 +419,216 @@ def cmd_quota(a):
     out(Api().rpc("my_quota"))
 
 
+def ist_today():
+    return dt.datetime.now(IST).date()
+
+
+def cmd_progress(a):
+    api = Api()
+    rows = api.rpc("daily_progress", p_day=a.day or str(ist_today()))
+    if not a.all:
+        rows = [r for r in rows if r["member_id"] == api.uid]
+    out(rows)
+
+
+def cmd_leaderboard(a):
+    t = ist_today()
+    start = {"today": t, "week": t - dt.timedelta(days=t.weekday()), "month": t.replace(day=1)}[a.period]
+    out(Api().rpc("leaderboard", p_from=str(start), p_to=str(t)))
+
+
+def cmd_target(a):
+    api = Api()
+    team = api.get("team", select="id,name,active", active="eq.true")
+    match = [m for m in team if m["name"].lower() == a.name.lower()]
+    if len(match) != 1:
+        sys.exit(f"No single active teammate named '{a.name}'. Team: {', '.join(m['name'] for m in team)}")
+    mid = match[0]["id"]
+    if a.clear:
+        if not a.day:
+            sys.exit("--clear needs --day YYYY-MM-DD")
+        out(api.rpc("clear_day_target", p_member=mid, p_day=a.day))
+        return
+    if None in (a.new, a.followups, a.conversations):
+        sys.exit("Give --new, --followups and --conversations (numbers).")
+    out(api.rpc("set_targets", p_member=mid, p_new_contacts=a.new, p_followups=a.followups,
+                p_conversations=a.conversations, p_day=a.day, p_note=a.note))
+
+
+# ---------------------------------------------------------------- reports (Claude turns these into plain-language summaries)
+def load_quotes():
+    with open(os.path.join(SKILL_DIR, "dashboard", "quotes.json"), encoding="utf-8") as f:
+        return json.load(f)
+
+
+def quote_of_day(day=None):
+    """Same pick as the dashboard: days since 1970-01-01 (IST date) modulo the list length."""
+    quotes = load_quotes()
+    day = day or ist_today()
+    return quotes[(day - dt.date(1970, 1, 1)).days % len(quotes)]
+
+
+def soft(fn):
+    """Run an API call; on error return {'error': ...} instead of exiting (so one missing piece doesn't kill a report)."""
+    try:
+        return fn()
+    except SystemExit as e:
+        return {"error": str(e)}
+
+
+def standing(board, uid):
+    if not isinstance(board, list) or not board:
+        return None
+    mine = next((r for r in board if r["member_id"] == uid), None)
+    if not mine:
+        return None
+    i = board.index(mine)
+    res = {"rank": mine["rank"], "of": len(board), "points": mine["points"]}
+    if i > 0:
+        above = board[i - 1]
+        res.update(next_above=above["name"], points_to_pass=above["points"] - mine["points"] + 1)
+    elif len(board) > 1:
+        res.update(leading_by=mine["points"] - board[1]["points"], second=board[1]["name"])
+    return res
+
+
+def open_promises(api, member_id=None, days=14):
+    """Things we promised in a logged conversation with no outgoing message to that lead since."""
+    since = (dt.datetime.now(IST) - dt.timedelta(days=days)).isoformat()
+    params = {"promised": "not.is.null", "occurred_at": f"gte.{since}", "order": "occurred_at.desc",
+              "select": "lead_id,promised,next_step,next_followup,occurred_at,member_id,leads(company,status,owner_id,dnc)"}
+    if member_id:
+        params["member_id"] = f"eq.{member_id}"
+    convos = api.get("conversations", **params)
+    latest = {}
+    for c in convos:
+        latest.setdefault(c["lead_id"], c)
+    if not latest:
+        return []
+    ids = ",".join(str(i) for i in latest)
+    outs = api.get("touches", lead_id=f"in.({ids})", direction="eq.out", select="lead_id,occurred_at",
+                   result="in.(sent,delivered,read)")
+    last_out = {}
+    for t in outs:
+        last_out[t["lead_id"]] = max(last_out.get(t["lead_id"], ""), t["occurred_at"])
+    res = []
+    for lid, c in latest.items():
+        lead = c.get("leads") or {}
+        if lead.get("dnc") or lead.get("status") in ("Won", "Lost", "Not Interested"):
+            continue
+        if last_out.get(lid, "") > c["occurred_at"]:
+            continue
+        res.append({"lead_id": lid, "company": lead.get("company"), "promised": c["promised"], "promised_on": c["occurred_at"],
+                    "next_step": c.get("next_step"), "follow_up": c.get("next_followup")})
+    return res
+
+
+def cmd_brief(a):
+    """Everything for a start-of-day briefing or an end-of-task report, for the signed-in user."""
+    api = Api()
+    t = ist_today()
+    week0 = t - dt.timedelta(days=t.weekday())
+    prog = soft(lambda: api.rpc("daily_progress", p_day=str(t)))
+    lb_today = soft(lambda: api.rpc("leaderboard", p_from=str(t), p_to=str(t)))
+    lb_week = soft(lambda: api.rpc("leaderboard", p_from=str(week0), p_to=str(t)))
+    mine = next((r for r in prog if r["member_id"] == api.uid), None) if isinstance(prog, list) else None
+    hot = api.get("pipeline", owner_id=f"eq.{api.uid}", status='in.(Replied,Interested,"Demo Scheduled","Proposal Sent")',
+                  select="id,company,status,next_followup,last_touch_at", order="last_touch_at.desc.nullslast")
+    due = api.get("followups_due", owner_id=f"eq.{api.uid}", select="id,company,status,next_followup,last_touch_at",
+                  order="next_followup.asc")
+    claimed = api.get("pipeline", owner_id=f"eq.{api.uid}", status="eq.Claimed", select="id,company,claimed_at", order="claimed_at")
+    out({
+        "date": str(t),
+        "quote": quote_of_day(t),
+        "progress": mine if mine else (prog if isinstance(prog, dict) else None),
+        "rank_today": standing(lb_today, api.uid),
+        "rank_week": standing(lb_week, api.uid),
+        "followups_due": due,
+        "hot_leads": hot,
+        "open_promises": open_promises(api, api.uid),
+        "claimed_not_contacted": claimed,
+    })
+
+
+def cmd_team_report(a):
+    """Team overview for the admin: progress vs targets, leaderboard, overdue work, stale claims, open promises."""
+    api = Api()
+    t = ist_today()
+    week0 = t - dt.timedelta(days=t.weekday())
+    stale_before = (dt.datetime.now(IST) - dt.timedelta(days=2)).isoformat()
+    due = api.get("followups_due", select="id,company,owner_name,next_followup,status", order="next_followup.asc")
+    overdue = {}
+    for d in due:
+        overdue.setdefault(d["owner_name"] or "Unowned", []).append(d["company"])
+    stale = api.get("pipeline", status="eq.Claimed", claimed_at=f"lt.{stale_before}", select="id,company,owner_name,claimed_at")
+    out({
+        "date": str(t),
+        "quote": quote_of_day(t),
+        "progress_today": soft(lambda: api.rpc("daily_progress", p_day=str(t))),
+        "leaderboard_today": soft(lambda: api.rpc("leaderboard", p_from=str(t), p_to=str(t))),
+        "leaderboard_week": soft(lambda: api.rpc("leaderboard", p_from=str(week0), p_to=str(t))),
+        "followups_due_by_person": overdue,
+        "claimed_over_2_days_no_outreach": stale,
+        "open_promises": open_promises(api),
+        "hot_leads": api.get("pipeline", status='in.(Interested,"Demo Scheduled","Proposal Sent")',
+                             select="id,company,status,owner_name,next_followup", order="next_followup.asc.nullslast"),
+    })
+
+
+def cmd_find(a):
+    """Find leads by (part of) company name, city, phone, email or website, so plain-language logging can resolve a lead."""
+    api = Api()
+    rows = api.get("pipeline", select="id,company,status,owner_id,owner_name,city,next_followup,dnc,contacts")
+    q = a.text.lower().strip()
+    qd = re.sub(r"\D", "", q)
+    words = [w for w in re.split(r"\W+", q) if w]
+    hits = []
+    for r in rows:
+        hay = " ".join([r["company"] or "", r["city"] or ""] + [c["value"] for c in (r.get("contacts") or [])]).lower()
+        score = 3 if q in (r["company"] or "").lower() else 0
+        score += sum(1 for w in words if w in hay)
+        if len(qd) >= 6 and qd in re.sub(r"\D", "", hay):
+            score += 5
+        if score:
+            hits.append((score, r))
+    hits.sort(key=lambda x: -x[0])
+    out([{**r, "mine": r["owner_id"] == api.uid} for _, r in hits[:8]])
+
+
+def cmd_watchlist(a):
+    """My active leads with where to look for replies (WhatsApp numbers, emails) and what's already logged,
+    so a 'check my replies' run only logs messages newer than the last logged one."""
+    api = Api()
+    leads = api.get("pipeline", owner_id=f"eq.{api.uid}", dnc="eq.false",
+                    status='in.(Contacted,Replied,Interested,"Demo Scheduled","Proposal Sent")',
+                    select="id,company,status,contacts,next_followup", order="last_touch_at.desc.nullslast")
+    if not leads:
+        out([])
+        return
+    ids = ",".join(str(l["id"]) for l in leads)
+    touches = api.get("touches", lead_id=f"in.({ids})", select="lead_id,direction,channel,contact_value,result,body,occurred_at",
+                      order="occurred_at.desc")
+    res = []
+    for l in leads:
+        ts = [t for t in touches if t["lead_id"] == l["id"]]
+        last_out = next((t for t in ts if t["direction"] == "out" and t["result"] in ("sent", "delivered", "read")), None)
+        last_in = next((t for t in ts if t["direction"] == "in"), None)
+        cs = l.get("contacts") or []
+        res.append({
+            "lead_id": l["id"], "company": l["company"], "status": l["status"], "next_followup": l["next_followup"],
+            "whatsapp_numbers": [c["value"] for c in cs if c["kind"] == "phone" and c.get("whatsapp") != "not_on_whatsapp"],
+            "emails": [c["value"] for c in cs if c["kind"] == "email"],
+            "last_sent": last_out and {"at": last_out["occurred_at"], "channel": last_out["channel"], "to": last_out["contact_value"]},
+            "last_reply_logged": last_in and {"at": last_in["occurred_at"], "channel": last_in["channel"],
+                                              "text": (last_in["body"] or "")[:160]},
+        })
+    out(res)
+
+
+def cmd_quote(a):
+    out(quote_of_day())
+
+
 def cmd_dnc(a):
     out(Api().rpc("mark_dnc", p_lead_id=a.lead_id, p_reason=a.reason))
 
@@ -467,12 +686,14 @@ def cmd_dashboard(a):
     cfg = load_cfg()
     if re.search(r"service_role|sb_secret_", cfg["key"]):
         sys.exit("The configured key looks like a secret key. Use the publishable (anon) key: crm.py setup ...")
-    template = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dashboard", "index.html")
+    template = os.path.join(SKILL_DIR, "dashboard", "index.html")
     html = open(template, encoding="utf-8").read()
     block = re.compile(r"/\*CONFIG\*/.*?/\*END CONFIG\*/", re.S)
-    if not block.search(html):
-        sys.exit("Dashboard template is missing its CONFIG block.")
+    qblock = re.compile(r"/\*QUOTES\*/.*?/\*END QUOTES\*/", re.S)
+    if not block.search(html) or not qblock.search(html):
+        sys.exit("Dashboard template is missing its CONFIG or QUOTES block.")
     filled = block.sub(lambda m: "/*CONFIG*/const CONFIG = " + json.dumps({"url": cfg["url"], "key": cfg["key"]}) + ";/*END CONFIG*/", html)
+    filled = qblock.sub(lambda m: "/*QUOTES*/const QUOTES = " + json.dumps(load_quotes(), ensure_ascii=False) + ";/*END QUOTES*/", filled)
     path = os.path.abspath(os.path.expanduser(a.out))
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -590,6 +811,19 @@ def main():
     s = sp.add_parser("mine"); s.add_argument("--status"); s.set_defaults(f=cmd_mine)
     s = sp.add_parser("followups"); s.add_argument("--all", action="store_true"); s.set_defaults(f=cmd_followups)
     sp.add_parser("quota").set_defaults(f=cmd_quota)
+    s = sp.add_parser("progress"); s.add_argument("--day"); s.add_argument("--all", action="store_true")
+    s.set_defaults(f=cmd_progress)
+    s = sp.add_parser("leaderboard"); s.add_argument("--period", choices=["today", "week", "month"], default="today")
+    s.set_defaults(f=cmd_leaderboard)
+    s = sp.add_parser("target"); s.add_argument("name"); s.add_argument("--new", type=int)
+    s.add_argument("--followups", type=int); s.add_argument("--conversations", type=int)
+    s.add_argument("--day", help="YYYY-MM-DD; omit to change the default"); s.add_argument("--note")
+    s.add_argument("--clear", action="store_true"); s.set_defaults(f=cmd_target)
+    sp.add_parser("brief").set_defaults(f=cmd_brief)
+    sp.add_parser("team-report").set_defaults(f=cmd_team_report)
+    s = sp.add_parser("find"); s.add_argument("text"); s.set_defaults(f=cmd_find)
+    sp.add_parser("quote").set_defaults(f=cmd_quote)
+    sp.add_parser("watchlist").set_defaults(f=cmd_watchlist)
     s = sp.add_parser("dnc"); s.add_argument("lead_id", type=int); s.add_argument("reason"); s.set_defaults(f=cmd_dnc)
     s = sp.add_parser("release"); s.add_argument("lead_id", type=int); s.set_defaults(f=cmd_release)
     s = sp.add_parser("reclaim"); s.add_argument("lead_id", type=int); s.set_defaults(f=cmd_reclaim)

@@ -5,6 +5,15 @@ One person (the admin) does steps 1–4 once. Every teammate then does step 5 on
 ## 1. Create the project
 1. Sign in at supabase.com → **New project**. Pick region **Mumbai (ap-south-1)**, set a database password and keep it safe.
 2. When it's ready, open **SQL Editor → New query**, paste all of `supabase/schema.sql`, and click **Run**. It should end with "Success".
+3. Then do the same with `supabase/002_targets_leaderboard.sql` (daily targets, progress, leaderboard).
+   **Already set up before targets existed?** Run only this file. It's safe to run more than once and keeps your data.
+
+## Daily targets (admin)
+Every teammate starts with a default of **10 new companies, 5 follow-ups and 2 conversations a day**. To change them:
+- **Dashboard:** go to **Team targets → Set targets**, or click a teammate's row. Choose "Every day" for their default, or "One specific day" for an override such as a half day or a push day.
+- **Claude / terminal:** `crm.py target Ravi --new 12 --followups 6 --conversations 3`. Add `--day 2026-11-20` for a single day.
+
+Everyone sees their own **My day** panel (percent done and what's pending), the team's progress, and the leaderboard.
 
 ## 2. Lock down sign-ups
 **Authentication → Sign In / Providers → Email**: turn **off** "Allow new users to sign up".
