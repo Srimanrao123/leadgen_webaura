@@ -437,6 +437,32 @@ def cmd_leaderboard(a):
     out(Api().rpc("leaderboard", p_from=str(start), p_to=str(t)))
 
 
+MILESTONES = (3, 7, 14, 30, 60, 100)
+
+
+def streak_info(row):
+    """Add a plain-language line and the next badge to one member_streaks row."""
+    if not isinstance(row, dict) or "current_streak" not in row:
+        if isinstance(row, dict) and "member_streaks" in str(row.get("error", "")):
+            return {"error": "Streaks are off: the admin needs to run supabase/004_streaks.sql."}
+        return row
+    cur = row["current_streak"]
+    nxt = next((m for m in MILESTONES if m > cur), None)
+    if row["hit_today"]:
+        say = f"{cur}-day streak, today locked in"
+    elif cur:
+        say = f"{cur}-day streak at risk: hit today's target to make it {cur + 1}"
+    else:
+        say = "No streak yet: hit 100% today to start one" + (f" (best so far {row['best_streak']})" if row["best_streak"] else "")
+    return {**row, "say": say, "next_badge": nxt, "days_to_next_badge": nxt - cur if nxt else None,
+            "badge_just_earned": row["hit_today"] and cur in MILESTONES}
+
+
+def cmd_streaks(a):
+    rows = Api().rpc("member_streaks")
+    out([streak_info(r) for r in sorted(rows, key=lambda r: (-r["current_streak"], -r["best_streak"], r["name"]))])
+
+
 def cmd_target(a):
     api = Api()
     team = api.get("team", select="id,name,active", active="eq.true")
@@ -531,6 +557,8 @@ def cmd_brief(a):
     prog = soft(lambda: api.rpc("daily_progress", p_day=str(t)))
     lb_today = soft(lambda: api.rpc("leaderboard", p_from=str(t), p_to=str(t)))
     lb_week = soft(lambda: api.rpc("leaderboard", p_from=str(week0), p_to=str(t)))
+    sk = soft(lambda: api.rpc("member_streaks"))
+    my_streak = next((r for r in sk if r["member_id"] == api.uid), None) if isinstance(sk, list) else sk
     mine = next((r for r in prog if r["member_id"] == api.uid), None) if isinstance(prog, list) else None
     hot = api.get("pipeline", owner_id=f"eq.{api.uid}", status='in.(Replied,Interested,"Demo Scheduled","Proposal Sent")',
                   select="id,company,status,next_followup,last_touch_at", order="last_touch_at.desc.nullslast")
@@ -543,6 +571,7 @@ def cmd_brief(a):
         "progress": mine if mine else (prog if isinstance(prog, dict) else None),
         "rank_today": standing(lb_today, api.uid),
         "rank_week": standing(lb_week, api.uid),
+        "streak": streak_info(my_streak),
         "followups_due": due,
         "hot_leads": hot,
         "open_promises": open_promises(api, api.uid),
@@ -567,6 +596,7 @@ def cmd_team_report(a):
         "progress_today": soft(lambda: api.rpc("daily_progress", p_day=str(t))),
         "leaderboard_today": soft(lambda: api.rpc("leaderboard", p_from=str(t), p_to=str(t))),
         "leaderboard_week": soft(lambda: api.rpc("leaderboard", p_from=str(week0), p_to=str(t))),
+        "streaks": (lambda sk: [streak_info(r) for r in sk] if isinstance(sk, list) else sk)(soft(lambda: api.rpc("member_streaks"))),
         "followups_due_by_person": overdue,
         "claimed_over_2_days_no_outreach": stale,
         "open_promises": open_promises(api),
@@ -578,7 +608,26 @@ def cmd_team_report(a):
 def cmd_find(a):
     """Find leads by (part of) company name, city, phone, email or website, so plain-language logging can resolve a lead."""
     api = Api()
-    rows = api.get("pipeline", select="id,company,status,owner_id,owner_name,city,next_followup,dnc,contacts")
+    keep = ("id", "company", "status", "owner_id", "owner_name", "city", "next_followup", "dnc", "contacts")
+    # Search in the database (003_lead_paging.sql): the whole phrase first, then each word.
+    first = soft(lambda: api.rpc("lead_page", p_q=a.text, p_limit=8))
+    if isinstance(first, dict) and "rows" in first:
+        found, order = {}, []
+        def add(rows, weight):
+            for r in rows:
+                if r["id"] not in found:
+                    found[r["id"]] = [0, {k: r.get(k) for k in keep}]
+                    order.append(r["id"])
+                found[r["id"]][0] += weight
+        add(first["rows"], 10)
+        if len(first["rows"]) < 8:
+            for w in {w for w in re.split(r"[^\w@.+]+", a.text) if len(w) >= 3}:
+                add(api.rpc("lead_page", p_q=w, p_limit=8)["rows"], 1)
+        ranked = sorted(order, key=lambda i: -found[i][0])[:8]
+        out([{**found[i][1], "mine": found[i][1]["owner_id"] == api.uid} for i in ranked])
+        return
+    # Older databases without lead_page: search in memory.
+    rows = api.get("pipeline", select=",".join(keep))
     q = a.text.lower().strip()
     qd = re.sub(r"\D", "", q)
     words = [w for w in re.split(r"\W+", q) if w]
@@ -792,6 +841,7 @@ def main():
     s = sp.add_parser("login"); s.add_argument("--email", default=read_dotenv().get("CRM_EMAIL"))
     s.set_defaults(f=cmd_login)
     sp.add_parser("whoami").set_defaults(f=cmd_whoami)
+    sp.add_parser("streaks").set_defaults(f=cmd_streaks)
     s = sp.add_parser("check"); s.add_argument("file"); s.set_defaults(f=cmd_check)
     s = sp.add_parser("claim"); s.add_argument("file"); s.add_argument("--allow-same-name", action="store_true")
     s.set_defaults(f=cmd_claim)

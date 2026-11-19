@@ -6,7 +6,10 @@ One person (the admin) does steps 1–4 once. Every teammate then does step 5 on
 1. Sign in at supabase.com → **New project**. Pick region **Mumbai (ap-south-1)**, set a database password and keep it safe.
 2. When it's ready, open **SQL Editor → New query**, paste all of `supabase/schema.sql`, and click **Run**. It should end with "Success".
 3. Then do the same with `supabase/002_targets_leaderboard.sql` (daily targets, progress, leaderboard).
-   **Already set up before targets existed?** Run only this file. It's safe to run more than once and keeps your data.
+4. Then `supabase/003_lead_paging.sql` (the lead list loads 25 at a time, with search and filters done in the database).
+5. Then `supabase/004_streaks.sql` (🔥 streaks: days in a row at 100% of target, with badges at 3, 7, 14 and 30 days).
+
+**Updating an existing project?** Run only the numbered files you haven't run yet, in order. Each one is safe to run more than once and keeps your data.
 
 ## Daily targets (admin)
 Every teammate starts with a default of **10 new companies, 5 follow-ups and 2 conversations a day**. To change them:
@@ -14,6 +17,8 @@ Every teammate starts with a default of **10 new companies, 5 follow-ups and 2 c
 - **Claude / terminal:** `crm.py target Ravi --new 12 --followups 6 --conversations 3`. Add `--day 2026-11-20` for a single day.
 
 Everyone sees their own **My day** panel (percent done and what's pending), the team's progress, and the leaderboard.
+
+**Streaks:** 🔥 counts days in a row at 100% of target. Sundays don't break it. For leave or a holiday, set that person's target to **0 / 0 / 0 for that day**, so their streak is paused rather than lost.
 
 ## 2. Lock down sign-ups
 **Authentication → Sign In / Providers → Email**: turn **off** "Allow new users to sign up".

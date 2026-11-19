@@ -68,7 +68,7 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .quote .by { margin-top: 4px; color: var(--muted); font-size: 13px; }
 
 /* My day */
-.myday { display: grid; grid-template-columns: 220px 1fr 1fr; }
+.myday { display: grid; grid-template-columns: 270px 1fr 1fr; }
 .myday > div { padding: 24px; }
 .myday > div + div { border-left: 1px solid var(--line); }
 @media (max-width: 880px) { .myday { grid-template-columns: 1fr; } .myday > div + div { border-left: 0; border-top: 1px solid var(--line); } }
@@ -77,6 +77,22 @@ header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ring svg { transform: rotate(-90deg); }
 .ring .val { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 800; }
 .cheer { font-weight: 700; }
+/* Streaks */
+:root[data-theme="dark"] .streak.hot { background: linear-gradient(135deg, #3a2310, #2d1a0c); color: #ffb37a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .streak.hot { background: linear-gradient(135deg, #3a2310, #2d1a0c); color: #ffb37a; } }
+.streak { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--panel-2); text-align: left; }
+.streak.hot { background: linear-gradient(135deg, #fff1e0, #ffe2cc); color: #7a3300; }
+.streak.risk { background: var(--warn-soft); color: var(--warn); }
+.streak .big { font-size: 20px; font-weight: 800; }
+.streak .ssub { font-size: 13px; margin-top: 2px; opacity: .9; }
+.badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--track); color: var(--muted); }
+.badge.on { background: var(--gold); color: #3d2b00; }
+.fl { font-size: 12px; font-weight: 700; color: #e8590c; margin-left: 6px; white-space: nowrap; }
+.fl.risk { opacity: .55; }
+.toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px); opacity: 0; pointer-events: none;
+  background: var(--text); color: var(--bg); padding: 12px 18px; border-radius: 12px; font-weight: 700; transition: all .35s ease; z-index: 99; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .metric { margin-bottom: 18px; }
 .metric:last-child { margin-bottom: 0; }
 .metric .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
@@ -153,6 +169,9 @@ tbody tr { cursor: pointer; }
 tbody tr:hover { background: var(--panel-2); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .empty { padding: 28px 20px; color: var(--muted); text-align: center; }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.pager:empty { display: none; }
+.pager > span:only-child { margin: 0 auto; }
 .banner { background: var(--warn-soft); color: var(--warn); padding: 10px 14px; border-radius: 12px; margin-top: 16px; font-size: 14px; }
 .wa-no { color: var(--danger); text-decoration: line-through; }
 
@@ -265,7 +284,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <div class="section">
     <div class="section-title"><h2>📋 All leads</h2><div class="stats" id="stats"></div></div>
-    <div class="card">
+    <div class="card" id="leadsCard">
       <div class="filters">
         <input id="q" type="search" placeholder="Search company, city, phone, email…">
         <select id="fOwner"></select>
@@ -282,6 +301,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         </table>
         <div class="empty hidden" id="emptyTable">No leads match these filters.</div>
       </div>
+      <div class="pager" id="pager"></div>
     </div>
   </div>
   <div class="muted small" id="updated" style="margin-top:16px;text-align:center"></div>
@@ -395,7 +415,11 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                 set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
 
-let sb, me, team = [], leads = [], progress = [], todayProgress = [], board = [], filterStatus = null, refreshTimer;
+let sb, me, team = [], progress = [], todayProgress = [], board = [], streaks = [], filterStatus = null, refreshTimer;
+let lastHitToday = null;   // to celebrate the moment today's target (and the streak) is reached
+// Lead list: only the current page is in memory. allLeads is used only in demo mode / before 003_lead_paging.sql.
+const PAGE_SIZE = 25;
+let pageNo = 0, pageRows = [], pageInfo = { total: 0, all_count: 0, status_counts: {} }, dueRows = [], stats = {}, allLeads = [], localMode = false;
 let lbPeriod = store.get("lbPeriod") || "today";
 
 // ---------------------------------------------------------------- theme
@@ -486,22 +510,84 @@ function periodRange(p) {
 async function load() {
   const [from, to] = periodRange(lbPeriod);
   const day = $("progressDay").value || todayIST();
-  const [t, p, prToday, prDay, lb] = await Promise.all([
+  const [t, d, st, prToday, prDay, lb, sk] = await Promise.all([
     sb.from("team").select("*").order("name"),
-    sb.from("pipeline").select("*").order("id"),
+    sb.from("followups_due").select("*").order("next_followup").limit(200),
+    sb.rpc("lead_stats"),
     sb.rpc("daily_progress", { p_day: todayIST() }),
     day === todayIST() ? Promise.resolve(null) : sb.rpc("daily_progress", { p_day: day }),
     sb.rpc("leaderboard", { p_from: from, p_to: to }),
+    sb.rpc("member_streaks"),
   ]);
-  const err = t.error || p.error;
+  const err = t.error || d.error;
   if (err) { banner(`Could not load data: ${err.message}`); return; }
-  const missing = prToday.error || (prDay && prDay.error) || lb.error;
-  banner(missing ? `Targets and leaderboard need the latest database update (run supabase/002_targets_leaderboard.sql). ${missing.message}` : "");
-  team = t.data; leads = p.data; board = lb.data || [];
+  const notes = [];
+  if (prToday.error || (prDay && prDay.error) || lb.error) notes.push("Targets and leaderboard need supabase/002_targets_leaderboard.sql.");
+  if (sk.error && !prToday.error) notes.push("Run supabase/004_streaks.sql to turn on 🔥 streaks.");
+  localMode = !!st.error;   // before 003_lead_paging.sql: fall back to loading leads in the browser
+  if (localMode) {
+    notes.push("Run supabase/003_lead_paging.sql so the lead list loads page by page.");
+    const all = await sb.from("pipeline").select("*").order("id").limit(2000);
+    if (all.error) { banner(`Could not load data: ${all.error.message}`); return; }
+    allLeads = all.data;
+    stats = localStats(allLeads);
+  } else stats = st.data;
+  banner(notes.join(" "));
+  team = t.data; dueRows = d.data; board = lb.data || []; streaks = sk.error ? [] : (sk.data || []);
+  celebrateStreak();
   todayProgress = prToday.data || []; progress = prDay ? (prDay.data || []) : todayProgress;
+  await loadPage();
   render();
   $("updated").textContent = "Updated " + new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) + " · refreshes every minute";
 }
+
+// ---------------------------------------------------------------- lead list paging (server side)
+function pageArgs() {
+  const owner = $("fOwner").value;
+  return { p_q: $("q").value.trim() || null, p_owner: owner === "__me" ? "me" : owner === "__none" ? "none" : owner || null,
+           p_category: $("fCat").value || null, p_status: filterStatus, p_limit: PAGE_SIZE, p_offset: pageNo * PAGE_SIZE };
+}
+let pageSeq = 0;
+async function loadPage() {
+  const args = pageArgs(), seq = ++pageSeq;
+  let res;
+  if (localMode || !sb) res = localPage(allLeads, args);
+  else {
+    const r = await sb.rpc("lead_page", args);
+    if (r.error) { banner(`Could not load leads: ${r.error.message}`); return; }
+    res = r.data;
+  }
+  if (seq !== pageSeq) return;   // a newer search already answered
+  pageInfo = res; pageRows = res.rows || [];
+  if (!pageRows.length && pageNo > 0 && res.total > 0) { pageNo = Math.max(0, Math.ceil(res.total / PAGE_SIZE) - 1); return loadPage(); }
+}
+// Same rules as lead_page() in SQL, for demo mode and for projects that haven't run 003 yet.
+function localPage(list, a) {
+  const q = (a.p_q || "").toLowerCase(), qd = q.replace(/\D/g, "");
+  const base = list.filter((l) => {
+    if (a.p_owner === "me" && l.owner_id !== me.id) return false;
+    if (a.p_owner === "none" && l.owner_id) return false;
+    if (a.p_owner && !["me", "none"].includes(a.p_owner) && l.owner_id !== a.p_owner) return false;
+    if (a.p_category && l.category !== a.p_category) return false;
+    if (q) {
+      const hay = [l.company, l.city, l.area, l.segment, l.website, l.owner_name, ...(l.contacts || []).map((c) => c.value)].join(" ").toLowerCase();
+      if (!hay.includes(q) && !(qd.length >= 4 && hay.replace(/\D/g, "").includes(qd))) return false;
+    }
+    return true;
+  });
+  const status_counts = {};
+  base.forEach((l) => (status_counts[l.status] = (status_counts[l.status] || 0) + 1));
+  const rank = (s) => { const i = SORT.indexOf(s); return i < 0 ? 99 : i; };
+  const filtered = base.filter((l) => !a.p_status || l.status === a.p_status)
+                       .sort((x, y) => rank(x.status) - rank(y.status) || (y.score ?? -1) - (x.score ?? -1) || x.id - y.id);
+  return { total: filtered.length, all_count: base.length, status_counts, rows: filtered.slice(a.p_offset, a.p_offset + a.p_limit) };
+}
+function localStats(list) {
+  return { leads: list.length, contacted: list.filter((l) => l.messages_sent > 0).length,
+           interested_plus: list.filter((l) => ["Interested", "Demo Scheduled", "Proposal Sent", "Won"].includes(l.status)).length,
+           won: list.filter((l) => l.status === "Won").length, categories: [...new Set(list.map((l) => l.category).filter(Boolean))].sort() };
+}
+async function refreshTable(resetPage = true) { if (resetPage) pageNo = 0; await loadPage(); renderTable(); }
 async function loadProgressOnly() {
   const day = $("progressDay").value || todayIST();
   if (day === todayIST() || !sb) { progress = todayProgress; return renderProgress(); }
@@ -519,11 +605,7 @@ function banner(msg) { $("banner").textContent = msg; $("banner").classList.togg
 // ---------------------------------------------------------------- render
 function render() { renderMyDay(); renderBoard(); renderProgress(); renderDue(); renderFilters(); renderTable(); renderStats(); }
 
-function myDue() {
-  const t = todayIST();
-  return leads.filter((l) => l.owner_id === me.id && !l.dnc && l.next_followup && l.next_followup <= t && ACTIVE.includes(l.status))
-              .sort((a, b) => a.next_followup.localeCompare(b.next_followup));
-}
+function myDue() { return dueRows.filter((l) => l.owner_id === me.id); }
 function ringSVG(pct) {
   const r = 64, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, pct));
   const col = p >= 100 ? "var(--ok)" : "url(#rg)";
@@ -545,6 +627,36 @@ function metric(icon, label, done, target) {
   return `<div class="metric"><div class="top"><span>${icon} ${esc(label)}</span><span><b>${done}</b> <span class="muted">/ ${target}</span>${done >= target ? " ✅" : ""}</span></div>
     <div class="bar ${done >= target ? "done" : ""}"><i style="width:${pct}%"></i></div></div>`;
 }
+const MILESTONES = [3, 7, 14, 30, 60, 100];
+const streakOf = (id) => streaks.find((s) => s.member_id === id);
+const flame = (id) => { const s = streakOf(id); return s && s.current_streak > 0
+  ? `<span class="fl ${s.at_risk ? "risk" : ""}" title="${s.current_streak}-day streak${s.at_risk ? " (today not hit yet)" : ""}">🔥${s.current_streak}</span>` : ""; };
+function streakCard() {
+  const s = streakOf(me.id);
+  if (!s) return "";
+  const cur = s.current_streak, next = MILESTONES.find((m) => m > cur);
+  const toNext = next ? `${plural(next - cur, "more day", "more days")} to the ${next}-day badge` : "Legend status 👑";
+  let cls = "", big, sub;
+  if (s.hit_today) { cls = "hot"; big = `🔥 ${cur}-day streak`; sub = `Today is locked in ✓ · ${toNext}`; }
+  else if (cur > 0) { cls = "risk"; big = `🔥 ${cur}-day streak`; sub = `Hit today's target to make it ${cur + 1} — don't break the chain!`; }
+  else { big = "🔥 Start a streak"; sub = s.best_streak ? `Hit today's target to start again · best so far: ${s.best_streak}` : "Hit 100% today and the flame lights up"; }
+  const badges = MILESTONES.slice(0, 4).map((m) => `<span class="badge ${s.best_streak >= m ? "on" : ""}" title="${m} days in a row">${m}d</span>`).join("");
+  return `<div class="streak ${cls}"><div class="big">${big}</div><div class="ssub">${sub}</div>
+    <div class="badges">${badges}</div><div class="small" style="margin-top:6px;opacity:.75">Best: ${s.best_streak} days · ${s.hits_last_30} target days in the last 30</div></div>`;
+}
+let toastTimer;
+function toast(msg) {
+  let t = $("toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 4500);
+}
+function celebrateStreak() {
+  const s = me && streakOf(me.id); if (!s) return;
+  if (lastHitToday === false && s.hit_today) {
+    const m = MILESTONES.includes(s.current_streak);
+    toast(m ? `🏅 ${s.current_streak}-day streak! New badge unlocked.` : `🔥 Target hit — streak now ${plural(s.current_streak, "day", "days")}!`);
+  }
+  lastHitToday = s.hit_today;
+}
 function renderMyDay() {
   const mine = todayProgress.find((p) => p.member_id === me.id);
   if (!mine) { $("myDay").innerHTML = `<div style="grid-column:1/-1" class="muted">Your daily targets will show here once the admin runs the latest database update.</div>`; return; }
@@ -562,6 +674,7 @@ function renderMyDay() {
       <div class="ring">${ringSVG(mine.percent)}<div class="val">${mine.percent}%</div></div>
       <div class="cheer">${cheer(mine.percent, left)}</div>
       ${mine.target_note ? `<div class="small muted" style="margin-top:6px">📝 ${esc(mine.target_note)}</div>` : ""}
+      ${streakCard()}
     </div>
     <div>
       ${metric("🆕", "New companies", mine.new_contacts, mine.target_new_contacts)}
@@ -590,15 +703,15 @@ function renderBoard() {
   const top = board.slice(0, 3), rest = board.slice(3);
   const medal = ["🥇", "🥈", "🥉"];
   const pod = (r, i) => r ? `<div class="pod p${i + 1} ${r.member_id === me.id ? "me" : ""}"><div class="medal">${r.points > 0 ? medal[i] : "·"}</div>
-      <div class="nm">${esc(r.name)}</div><div class="pt">${r.points} pts</div><div class="block">${i + 1}</div></div>` : `<div></div>`;
+      <div class="nm">${esc(r.name)}</div><div class="pt">${r.points} pts${flame(r.member_id)}</div><div class="block">${i + 1}</div></div>` : `<div></div>`;
   const breakdown = (r) => [["new", r.new_contacts], ["follow-ups", r.followups], ["conv", r.conversations], ["interested", r.interested],
     ["demos", r.demos], ["proposals", r.proposals], ["won", r.won]].filter(([, n]) => n > 0).map(([k, n]) => `${n} ${k}`).join(" · ") || "No activity yet";
   $("leaderboard").innerHTML = `
     ${pos ? `<div class="mypos">${pos}</div>` : ""}
     <div class="podium">${pod(top[1], 1)}${pod(top[0], 0)}${pod(top[2], 2)}</div>
     ${rest.map((r) => `<div class="lbrow ${r.member_id === me.id ? "me" : ""}"><span class="rk">${r.rank}</span>
-      <div class="grow"><b>${esc(r.name)}</b><div class="muted small ellipsis">${breakdown(r)}</div></div><span class="pts">${r.points}</span></div>`).join("")}
-    <div class="rules">Points: new company 1 · follow-up 1 · conversation 3 · interested 5 · demo 8 · proposal 10 · won 25</div>`;
+      <div class="grow"><b>${esc(r.name)}</b>${flame(r.member_id)}<div class="muted small ellipsis">${breakdown(r)}</div></div><span class="pts">${r.points}</span></div>`).join("")}
+    <div class="rules">🔥 = days in a row at 100% of target (Sundays and days off don't break it) · Points: new company 1 · follow-up 1 · conversation 3 · interested 5 · demo 8 · proposal 10 · won 25</div>`;
 }
 $("lbTabs").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; lbPeriod = b.dataset.p; store.set("lbPeriod", lbPeriod); loadBoardOnly(); };
 $("progressDay").onchange = () => loadProgressOnly();
@@ -607,7 +720,7 @@ function renderProgress() {
   const sorted = [...progress].sort((a, b) => b.percent - a.percent || a.name.localeCompare(b.name));
   $("teamProgress").innerHTML = sorted.length ? sorted.map((p) => `
     <div class="tt ${me.is_admin ? "click" : ""} ${p.member_id === me.id ? "me" : ""}" data-member="${esc(p.member_id)}">
-      <div class="line1"><span><b>${esc(p.name)}</b>${p.custom_target ? `<span class="pill" title="${esc(p.target_note || "")}">today: custom</span>` : ""}</span>
+      <div class="line1"><span><b>${esc(p.name)}</b>${flame(p.member_id)}${p.custom_target ? `<span class="pill" title="${esc(p.target_note || "")}">today: custom</span>` : ""}</span>
         <span><b>${p.percent}%</b> ${p.percent >= 100 ? "🏆" : p.percent >= 75 ? "🔥" : ""}</span></div>
       <div class="bar ${p.percent >= 100 ? "done" : ""}"><i style="width:${Math.min(100, p.percent)}%"></i></div>
       <div class="muted small" style="margin-top:6px">🆕 ${p.new_contacts}/${p.target_new_contacts} · 🔁 ${p.followups}/${p.target_followups} · 💬 ${p.conversations}/${p.target_conversations}${p.followups_due ? ` · <span class="due">${p.followups_due} due</span>` : ""}</div>
@@ -616,16 +729,13 @@ function renderProgress() {
 }
 
 function renderStats() {
-  const c = (pred) => leads.filter(pred).length;
-  $("stats").innerHTML = [["Leads", leads.length], ["Contacted", c((l) => l.messages_sent > 0)],
-    ["Interested+", c((l) => ["Interested", "Demo Scheduled", "Proposal Sent", "Won"].includes(l.status))], ["Won", c((l) => l.status === "Won")]]
+  $("stats").innerHTML = [["Leads", stats.leads ?? 0], ["Contacted", stats.contacted ?? 0], ["Interested+", stats.interested_plus ?? 0], ["Won", stats.won ?? 0]]
     .map(([k, n]) => `<span><b>${n}</b> ${k}</span>`).join("");
 }
 
 function renderDue() {
   const t = todayIST();
-  const due = leads.filter((l) => !l.dnc && l.next_followup && l.next_followup <= t && ACTIVE.includes(l.status))
-                   .sort((a, b) => (b.owner_id === me.id) - (a.owner_id === me.id) || a.next_followup.localeCompare(b.next_followup));
+  const due = [...dueRows].sort((a, b) => (b.owner_id === me.id) - (a.owner_id === me.id) || a.next_followup.localeCompare(b.next_followup));
   $("dueCount").textContent = due.length ? `${due.length} due` : "";
   $("dueList").innerHTML = due.length ? due.map((l) => `
     <div class="row click" data-id="${l.id}">
@@ -641,36 +751,23 @@ function renderFilters() {
     team.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("");
   ownerSel.value = keepOwner;
   const catSel = $("fCat"), keepCat = catSel.value;
-  const cats = [...new Set(leads.map((l) => l.category).filter(Boolean))].sort();
+  const cats = stats.categories || [];
   catSel.innerHTML = `<option value="">All categories</option>` + cats.map((c) => `<option>${esc(c)}</option>`).join("");
   catSel.value = keepCat;
 }
 
-function filtered(ignoreStatus) {
-  const q = $("q").value.trim().toLowerCase(), owner = $("fOwner").value, cat = $("fCat").value;
-  const qDigits = q.replace(/\D/g, "");
-  return leads.filter((l) => {
-    if (!ignoreStatus && filterStatus && l.status !== filterStatus) return false;
-    if (owner === "__me" && l.owner_id !== me.id) return false;
-    if (owner === "__none" && l.owner_id) return false;
-    if (owner && !owner.startsWith("__") && l.owner_id !== owner) return false;
-    if (cat && l.category !== cat) return false;
-    if (q) {
-      const hay = [l.company, l.city, l.area, l.segment, l.website, l.owner_name, ...(l.contacts || []).map((c) => c.value)].join(" ").toLowerCase();
-      if (!hay.includes(q) && !(qDigits.length >= 4 && hay.replace(/\s/g, "").includes(qDigits))) return false;
-    }
-    return true;
-  });
-}
-
 function renderTable() {
-  const base = filtered(true);
-  const counts = {};
-  base.forEach((l) => (counts[l.status] = (counts[l.status] || 0) + 1));
-  $("statusBar").innerHTML = `<span class="chip ${filterStatus ? "" : "on"}" data-status="">All ${base.length}</span>` +
+  const counts = pageInfo.status_counts || {};
+  $("statusBar").innerHTML = `<span class="chip ${filterStatus ? "" : "on"}" data-status="">All ${pageInfo.all_count ?? 0}</span>` +
     STATUS_ORDER.filter((s) => counts[s]).map((s) => `<span class="chip ${cls(s)} ${filterStatus === s ? "on" : ""}" data-status="${esc(s)}">${esc(s)} ${counts[s]}</span>`).join("");
-  const rank = (s) => { const i = SORT.indexOf(s); return i < 0 ? SORT.length : i; };
-  const rows = filtered(false).sort((a, b) => (rank(a.status) - rank(b.status)) || ((b.score || 0) - (a.score || 0)));
+  const rows = pageRows;
+  const total = pageInfo.total || 0, pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const from = total ? pageNo * PAGE_SIZE + 1 : 0, to = Math.min(total, (pageNo + 1) * PAGE_SIZE);
+  $("pager").innerHTML = total > PAGE_SIZE ? `
+    <button class="btn small" data-pg="prev" ${pageNo === 0 ? "disabled" : ""}>← Previous</button>
+    <span class="muted small">${from}–${to} of ${total} · page ${pageNo + 1} of ${pages}</span>
+    <button class="btn small" data-pg="next" ${pageNo >= pages - 1 ? "disabled" : ""}>Next →</button>`
+    : total ? `<span class="muted small">${total} lead${total === 1 ? "" : "s"}</span>` : "";
   const t = todayIST();
   $("tbody").innerHTML = rows.map((l) => `
     <tr data-id="${l.id}">
@@ -686,10 +783,17 @@ function renderTable() {
   $("emptyTable").classList.toggle("hidden", rows.length > 0);
 }
 
-$("q").oninput = renderTable;
-$("fOwner").onchange = renderTable;
-$("fCat").onchange = renderTable;
-$("statusBar").onclick = (e) => { const c = e.target.closest("[data-status]"); if (!c) return; filterStatus = c.dataset.status || null; renderTable(); };
+let searchTimer = null;
+$("q").oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshTable(), 300); };
+$("fOwner").onchange = () => refreshTable();
+$("fCat").onchange = () => refreshTable();
+$("statusBar").onclick = (e) => { const c = e.target.closest("[data-status]"); if (!c) return; filterStatus = c.dataset.status || null; refreshTable(); };
+$("pager").onclick = async (e) => {
+  const b = e.target.closest("[data-pg]"); if (!b || b.disabled) return;
+  pageNo += b.dataset.pg === "next" ? 1 : -1;
+  await refreshTable(false);
+  $("leadsCard").scrollIntoView({ behavior: "smooth", block: "start" });
+};
 document.addEventListener("click", (e) => {
   const o = e.target.closest("[data-open]");
   if (o) { e.preventDefault(); openLead(+o.dataset.open); return; }
@@ -754,7 +858,7 @@ async function checkLeadDupes() {
   const box = $("nlDupes");
   if (!p.company && !p.contacts.length && !p.website) { box.classList.add("hidden"); return []; }
   if (!sb) {   // demo: match against sample leads by name
-    const hit = leads.filter((l) => p.company && l.company.toLowerCase() === p.company.toLowerCase());
+    const hit = allLeads.filter((l) => p.company && l.company.toLowerCase() === p.company.toLowerCase());
     const dups = hit.map((l) => ({ lead_id: l.id, company: l.company, owner_name: l.owner_name, status: l.status, dnc: l.dnc, matched_on: "name" }));
     box.innerHTML = dups.length ? dupHTML(dups, true) : ""; box.classList.toggle("hidden", !dups.length); return dups;
   }
@@ -775,7 +879,7 @@ function openAddLead() {
   $("nlContactBox").classList.add("hidden");
   $("nlChannel").innerHTML = CHANNELS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
   setNewLeadResults();
-  $("catList").innerHTML = [...new Set(leads.map((l) => l.category).filter(Boolean))].map((c) => `<option value="${esc(c)}">`).join("");
+  $("catList").innerHTML = (stats.categories || []).map((c) => `<option value="${esc(c)}">`).join("");
   $("leadModal").classList.add("open"); $("modalBg").classList.add("open");
   $("nlCompany").focus();
 }
@@ -850,8 +954,14 @@ $("tClear").onclick = async () => {
 };
 
 // ---------------------------------------------------------------- lead drawer
+async function findLead(id) {
+  const l = pageRows.find((x) => x.id === id) || dueRows.find((x) => x.id === id) || allLeads.find((x) => x.id === id);
+  if (l || !sb) return l;
+  const r = await sb.from("pipeline").select("*").eq("id", id).maybeSingle();   // not on this page: fetch just this one
+  return r.data;
+}
 async function openLead(id) {
-  const l = leads.find((x) => x.id === id);
+  const l = await findLead(id);
   if (!l) return;
   $("dTitle").innerHTML = `${esc(l.company)} ${chip(l.status)}`;
   $("dBody").innerHTML = `<div class="muted">Loading…</div>`;
@@ -1052,13 +1162,18 @@ function loadDemo() {
   team = names.map(([id, name]) => ({ id, name, active: true, target_new_contacts: 10, target_followups: 5, target_conversations: 2 }));
   const L = (id, company, status, owner, extra = {}) => ({ id, company, status, owner_id: owner, owner_name: team.find((m) => m.id === owner)?.name || null,
     category: "construction", city: "Hyderabad", score: 70, messages_sent: 1, messages_received: 0, conversations: 0, dnc: false, last_touch_at: now, next_followup: null, contacts: [], ...extra });
-  leads = [
+  allLeads = [
     L(1, "Sample Builders", "Interested", "u1", { next_followup: t, messages_received: 1, conversations: 1, contacts: [{ kind: "phone", value: "919000000001", whatsapp: "on_whatsapp" }, { kind: "email", value: "info@sample.in" }] }),
     L(2, "Example Homes", "Contacted", "u2", { next_followup: addDays(t, 3) }),
     L(3, "Demo Infra <b>x</b>", "Claimed", "u1", { messages_sent: 0, contacts: [{ kind: "phone", value: "919000000003", whatsapp: "not_on_whatsapp" }] }),
     L(4, "Test Constructions", "Do Not Contact", "u2", { dnc: true, dnc_reason: "Asked to stop" }),
     L(5, "Second Due Co", "Contacted", "u1", { next_followup: addDays(t, -1) }),
+    // 55 more so paging can be tried in demo mode
+    ...Array.from({ length: 55 }, (_, i) => L(6 + i, `Demo Lead ${i + 1}`, i % 5 === 0 ? "Contacted" : "Claimed", names[i % 5][0],
+      { category: i % 3 === 0 ? "clinic" : "construction", score: 40 + (i * 7) % 60, messages_sent: i % 5 === 0 ? 1 : 0 })),
   ];
+  dueRows = allLeads.filter((l) => !l.dnc && l.next_followup && l.next_followup <= t && ACTIVE.includes(l.status));
+  stats = localStats(allLeads); localMode = true;
   const P = (id, name, n, f, c, pct, extra = {}) => ({ member_id: id, name, day: t, custom_target: false, target_note: null, target_new_contacts: 10, target_followups: 5, target_conversations: 2,
     new_contacts: n, followups: f, conversations: c, pending_new_contacts: Math.max(10 - n, 0), pending_followups: Math.max(5 - f, 0), pending_conversations: Math.max(2 - c, 0), followups_due: 0, percent: pct, ...extra });
   todayProgress = progress = [P("u2", "Santosh", 10, 5, 2, 100), P("u1", "Sriman", 6, 2, 1, 53, { followups_due: 2 }), P("u3", "Ronith", 8, 3, 1, 71),
@@ -1070,13 +1185,20 @@ function loadDemo() {
     { rank: 4, member_id: "u4", name: "Rohith", points: 3, new_contacts: 2, followups: 1, conversations: 0, interested: 0, demos: 0, proposals: 0, won: 0 },
     { rank: 5, member_id: "u5", name: "Gopal Reddy", points: 0, new_contacts: 0, followups: 0, conversations: 0, interested: 0, demos: 0, proposals: 0, won: 0 },
   ];
+  streaks = [
+    { member_id: "u2", name: "Santosh", current_streak: 7, best_streak: 7, hit_today: true, at_risk: false, hits_last_30: 18 },
+    { member_id: "u1", name: "Sriman", current_streak: 4, best_streak: 9, hit_today: false, at_risk: true, hits_last_30: 15 },
+    { member_id: "u3", name: "Ronith", current_streak: 2, best_streak: 3, hit_today: false, at_risk: true, hits_last_30: 8 },
+    { member_id: "u4", name: "Rohith", current_streak: 0, best_streak: 2, hit_today: false, at_risk: false, hits_last_30: 3 },
+    { member_id: "u5", name: "Gopal Reddy", current_streak: 0, best_streak: 0, hit_today: false, at_risk: false, hits_last_30: 0 },
+  ];
   DEMO = { touches: { 1: [{ occurred_at: now, channel: "whatsapp", direction: "out", result: "sent", contact_value: "919000000001", body: "Hi team,\n\nSample message.", team: { name: "Sriman" } },
                           { occurred_at: now, channel: "whatsapp", direction: "in", result: "replied", contact_value: "919000000001", body: "Hi sure" }] },
            convos: { 1: [{ occurred_at: now, kind: "call", outcome: "positive", summary: "Sample call summary.", current_tools: "Excel + WhatsApp", next_step: "Send demo", next_followup: t, team: { name: "Sriman" } }] } };
   greet();
   $("setTargetsBtn").classList.remove("hidden");
   $("logoutBtn").classList.add("hidden"); $("refreshBtn").classList.add("hidden");
-  show("app"); render(); banner("Demo mode: sample data, not your CRM. Saving is disabled.");
+  show("app"); loadPage().then(render); banner("Demo mode: sample data, not your CRM. Saving is disabled.");
 }
 
 boot();

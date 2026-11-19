@@ -29,7 +29,7 @@ Teammates work only by talking to you. Everything that touches the CRM is your j
    - If it says "Not signed in", give them `python3 <skill>/scripts/crm.py login` to run **in their own terminal**. Never ask for, type or store their Supabase password, and never write keys into tracked files. Only `.env` holds them, and it's git-ignored.
    - If `active` is false, tell them an admin must activate them.
    - The team row gives the user's name for the sign-off.
-2. Run `crm.py brief`. It returns their progress, rank, due follow-ups, hot leads, open promises, untouched claims and the quote of the day.
+2. Run `crm.py brief`. It returns their progress, 🔥 streak, rank, due follow-ups, hot leads, open promises, untouched claims and the quote of the day. When the streak is at risk, use it as the day's motivation ("hit today's target to make it 7").
    - If they opened with a greeting or "what should I do today", give the **Morning briefing** from reports.md.
    - Otherwise, open with one line on their day, e.g. *"You're at 40% of today's target: 6 more new companies, 2 follow-ups and 1 conversation to go."*
    - Plan the session to close what's pending: **overdue promises first**, then due follow-ups, then enough new companies to reach the target.

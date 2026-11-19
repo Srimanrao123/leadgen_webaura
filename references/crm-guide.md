@@ -80,9 +80,12 @@ Only messages that actually went out count (sent/delivered/read). Failed sends d
 | `progress` | Your targets vs achieved today, what's still pending, and follow-ups due |
 | `progress --all [--day 2026-11-18]` | Everyone, for any day |
 | `leaderboard --period today\|week\|month` | Ranked by points: new contact 1, follow-up 1, conversation 3, reached Interested 5, Demo Scheduled 8, Proposal Sent 10, Won 25 |
+| `streaks` | Everyone's 🔥 streak: current, best, `hit_today`, `at_risk`, the next badge (3/7/14/30/60/100 days) and a ready `say` line |
 | `target Ravi --new 10 --followups 5 --conversations 2` | (admin) Ravi's default for every day |
 | `target Ravi --new 4 --followups 2 --conversations 1 --day 2026-11-20 --note "Half day"` | (admin) one day only |
 | `target Ravi --day 2026-11-20 --clear` | (admin) remove that day's override |
+
+**Streaks** (needs `supabase/004_streaks.sql`): a streak day is a day at 100% of that day's target. Sundays without a hit, days whose targets are all 0 (set a 0/0/0 day target for leave or holidays) and days before someone joined are skipped, so they don't break it. Today never breaks it: until it's hit, the streak is "at risk". Past days are judged against each person's default targets as they are now, plus any one-day overrides.
 
 Several conversations with the same lead at different times are fine. Log each one separately with its own `occurred_at`. The dashboard's lead panel has **+ Add conversation** and **+ Log message** buttons for doing this by hand.
 
