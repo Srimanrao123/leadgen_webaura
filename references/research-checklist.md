@@ -1,40 +1,56 @@
-# Research checklist (per clinic)
+# Lead Research Checklist (Webaura)
 
-Collect all of this before writing. Use several sources and don't stop at the first contact you find.
+Collect verifiable facts across several sources before writing. Never guess or assume.
 
-## Website (fetch the homepage, then contact/about/blog if needed)
-- Clinic name, address (is it really in the target area?), hours
-- Doctors/founder: names, qualifications, years of experience
-- Key services, especially high-value ones (implants, aligners, veneers, MNRF, PRP/GFC, hair transplant, IVF, LASIK)
-- **Email:** check the footer and the contact page. Ignore template text like info@example.com
-- **Phone/WhatsApp:** look for wa.me links, which are often a different number from the main phone
-- Social links: Instagram, YouTube, Facebook (note icons that don't link anywhere)
-- **Videos on the site:** none, an empty "video/transformations" section, or embedded videos
-- **Blog:** post titles and dates. Recent written posts with no video version are the strongest angle
-- Oddities worth a polite P.S.: template leftovers, broken social links, a wrong address
+---
 
-## Instagram
-Fetch `instagram.com/<handle>/` with a browser tool's page-text reader. Without a login you usually still get:
-- Follower count, bio, highlight names (for example "Q&A", "DidYouKnow?", "Patient Reviews")
-- Sometimes recent post captions: format (Reels vs images) and topics (promotional vs educational)
+## 1. Website Verification (Critical Rule)
 
-If the grid needs a login, **don't sign in**. Use only what you could see.
-Make sure the account is actually theirs: a matching name/city and a link to their website. A handle with the clinic's name can belong to a different business.
+**Never assume a business does not have a website just because a web scraper or direct request timed out.**
+Always check:
+1. **Google Maps / Google Business Profile:** Look for the official "Website" button.
+2. **Search Engines:** Search `"[Business Name]" [Area] official website` or check `.in`, `.com`, `.co.in` directly.
+3. **Social Profiles:** Check their Instagram bio link (`instagram.com/<handle>`), Facebook Page "About" section, or Practo / Justdial / 99acres profile links.
+4. **Always store the full URL with `https://`** (e.g. `https://treatmentrangehospitals.com`, not `treatmentrangehospitals.com`).
 
-## YouTube
-- Is there a channel? When was the last upload? Roughly how many videos?
-- An active channel with weekly uploads is a sign of strong presence (see SKILL.md Step 2).
+> [!WARNING]
+> If a website fails to load due to firewall, Cloudflare, or temporary network issues, **DO NOT tell the business they have no website**. Either verify manually or choose the **WhatsApp Automation** or **CRM / Lead Tracking** angle instead.
 
-## Google / directories
-- Review count and rating show demand
-- Number of branches: a chain is a disqualifier
-- Press articles: launches and awards. Monthly press means a marketing team
+---
 
-## Record for the sheet
-Clinic Name, Website, Specialty, Doctor/Founder, Email, Phone, Instagram (handle + followers), Address,
-Content Findings (only verified facts, with dates), Content Opportunity, Lead Score, Message Type, Email Subject, Message, Status, Sent Date, Follow-up Date, Channels Sent, Notes.
+## 2. What to Research by Channel
 
-## Search tips
-- Searches mostly return directories. Get the clinic name there, then search "<name> <area>" or try `clinicname.com` / `.in` directly.
-- DuckDuckGo's HTML endpoint shows a CAPTCHA, so don't use it. Never solve CAPTCHAs.
-- If a search or fetch fails on a temporary error, retry once, then move on to another clinic.
+### Website & Lead Capture Flow
+- **WhatsApp Integration:** Is there a floating click-to-WhatsApp button?
+  - Does it open a direct `wa.me` link?
+  - Does it have a pre-filled message (e.g., *"Hi, I want to book an appointment"*), or is it blank?
+- **Mobile Experience:** Is the site responsive, or does text overlap on mobile?
+- **Contact Info:** Public business email (footer/contact page) and business WhatsApp number.
+- **Key Decision Makers:** Names of founders, lead doctors, or managing directors.
+- **High-Value Offerings:**
+  - *Clinics/Hospitals:* High-margin treatments (implants, aligners, hair transplant, IVF, LASIK, ortho).
+  - *Builders:* Ongoing projects, location, villa/flat types (2BHK, 3BHK, luxury villas).
+
+### WhatsApp Presence
+- Run `open "whatsapp://send?phone=91XXXXXXXXXX"` or check via WhatsApp Desktop.
+- Check if it is a verified **WhatsApp Business Account**.
+- Note the auto-reply (if any): Is it a default "Hi, thanks for reaching out, we will get back to you", or a smart automated menu?
+
+### Social Media (Instagram / Facebook)
+- Real follower count and posting frequency.
+- Bio link: Does it lead to an active landing page or directly to WhatsApp?
+- Are they running ads? (Check Meta Ad Library if needed).
+
+---
+
+## 3. Data to Record for CRM
+- **Company Name**
+- **Website:** (Always include `https://`)
+- **Category:** `clinic`, `hospital`, `builder`, `real_estate`, `salon`, etc.
+- **City & Area** (e.g., Kondapur, Jubilee Hills, Gachibowli)
+- **Contact Person & Role** (e.g., Dr. [Name], Managing Director, Sales Head)
+- **Public Phone / WhatsApp**
+- **Public Business Email**
+- **Instagram Handle**
+- **Findings:** 1–2 specific, verified observations (e.g., "Active WhatsApp number on site, but no automated after-hours reply; strong Google reviews for dental implants").
+- **Selected Angle:** WhatsApp Automation, Custom CRM, Performance Ads, or Mobile Conversion.

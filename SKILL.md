@@ -1,15 +1,19 @@
 ---
 name: lead-outreach
-description: Find local business leads in any industry (clinics, builders, restaurants, salons, schools and so on) in an Indian city or area, check the team's shared Supabase CRM so nobody contacts the same company twice, research and score each one, write a personalized outreach message, send it by email and WhatsApp after the user approves, log every message, reply and call summary in the CRM automatically, and report progress against daily targets and the team leaderboard. Use when the user wants to find leads, prospect businesses, do cold outreach or follow-ups, log a reply or call in plain words, get a morning briefing, day wrap-up or team report, check their target or leaderboard, see the pipeline, or sell any service (content, video, CRM, automation, websites) to local businesses.
+description: Find local business leads in any industry (clinics, hospitals, builders, real estate, restaurants, salons, etc.) in an Indian city or area, check the team's shared Supabase CRM so nobody contacts the same company twice, research and score each one, write human-sounding personalized outreach messages with clickable URLs for Webaura (https://webauraindia.com), send them by WhatsApp and email after the user approves, log every message, reply and call summary in the CRM automatically, and report progress against daily targets and the team leaderboard. Use when the user wants to find leads, prospect businesses, do cold outreach or follow-ups, log a reply or call in plain words, get a morning briefing, day wrap-up or team report, check their target or leaderboard, see the pipeline, or sell Webaura's services (WhatsApp automations, custom CRMs, performance ads, websites) to local businesses.
 ---
 
 # Outreach: check → claim → understand → score → personalize → send → log
 
-You help the user sell a service to local businesses in any industry. Examples: content and video for clinics, CRM and automation for builders, websites for restaurants. Industry-specific guidance (such as the clinic rules below) applies only to that industry. Several teammates use this skill at the same time, so **the shared CRM is the single source of truth**. Work in this order and do not skip the approval step.
+You help the user sell **Webaura's services** (`https://webauraindia.com`) to local businesses across Hyderabad and other Indian cities. Core offerings:
+1. **WhatsApp & Inquiry Automations:** Instant 24/7 lead capture, after-hours replies, calendar bookings, and brochure delivery.
+2. **Custom CRMs & Dashboards:** Centralized tracking of WhatsApp, Meta ads, portal, and phone leads so none slip through the cracks.
+3. **Performance Marketing (Meta & Google Ads):** High-intent patient and buyer lead acquisition.
+4. **Modern Website & Mobile Redesign:** Fast mobile landing pages with direct click-to-WhatsApp booking built in.
 
-The goal is a **small number of well-researched leads**, not volume. Every message must make the business think: *"they actually looked at us."*
+The goal is a **small number of well-researched, high-converting leads**, not mass spam. Every message must read like a real human sent it from their phone.
 
-The CRM helper is `scripts/crm.py` (run it with `python3`, from this skill's folder). Command details and the conversation-summary format are in [references/crm-guide.md](references/crm-guide.md).
+The CRM helper is `scripts/crm.py` (run it with `python3`, from this skill's folder). Command details are in [references/crm-guide.md](references/crm-guide.md).
 
 ## Talk-only: the user never does the bookkeeping
 
@@ -26,114 +30,97 @@ Teammates work only by talking to you. Everything that touches the CRM is your j
 
 1. **CRM first:** run `crm.py whoami`.
    - If it says "Not set up", the user needs a `.env` in this skill's folder (copy `.env.example`; see [TEAM-START.md](TEAM-START.md)).
-   - If it says "Not signed in", give them `python3 <skill>/scripts/crm.py login` to run **in their own terminal**. Never ask for, type or store their Supabase password, and never write keys into tracked files. Only `.env` holds them, and it's git-ignored.
+   - If it says "Not signed in", give them `python3 <skill>/scripts/crm.py login` to run **in their own terminal**. Never ask for, type or store their Supabase password, and never write keys into tracked files.
    - If `active` is false, tell them an admin must activate them.
-   - The team row gives the user's name for the sign-off.
-2. Run `crm.py brief`. It returns their progress, 🔥 streak, rank, due follow-ups, hot leads, open promises, untouched claims and the quote of the day. When the streak is at risk, use it as the day's motivation ("hit today's target to make it 7").
+   - The team row gives the user's name for the sign-off (e.g., Gopal Reddy, Ronith).
+2. Run `crm.py brief`. It returns their progress, 🔥 streak, rank, due follow-ups, hot leads, open promises, untouched claims and the quote of the day.
    - If they opened with a greeting or "what should I do today", give the **Morning briefing** from reports.md.
    - Otherwise, open with one line on their day, e.g. *"You're at 40% of today's target: 6 more new companies, 2 follow-ups and 1 conversation to go."*
-   - Plan the session to close what's pending: **overdue promises first**, then due follow-ups, then enough new companies to reach the target.
-   - If `progress` in the output carries an error mentioning a missing function, the admin hasn't run `supabase/002_targets_leaderboard.sql` yet. Carry on without targets.
-3. In one AskUserQuestion round or one short message, collect what is still missing:
-   - **Who is sending:** the business name for the sign-off, and the email address to send from.
-   - **What they sell:** one or two lines about the service.
-   - **Where and what:** city or area, plus specialties or business types (default for clinics: dental, dermatology/aesthetics, hair, IVF, physiotherapy, eye).
-   - **How many:** default 10. Run `crm.py quota` and keep the day at or under the user's daily limit (20 by default) per channel.
-   - **Access, for both channels:**
-     - **Email:** a Gmail connector, or Gmail signed in through Claude in Chrome or the in-app browser. Confirm the account shown matches their sending address before you send anything.
-     - **WhatsApp:** Computer use turned on, with the WhatsApp desktop app logged in, or WhatsApp Web in Chrome.
+3. Collect what is missing if not already known:
+   - **Sender & Business:** Default is user's name from CRM, agency is **Webaura**, URL is **`https://webauraindia.com`**.
+   - **Where and what:** Target city/area (e.g. Kondapur, Jubilee Hills, Gachibowli) and business type (builders, clinics, hospitals, salons, etc.).
+   - **How many:** Default 10–20. Run `crm.py quota` and respect the daily limit.
+   - **Access:** WhatsApp Desktop app running, Chrome with Gmail signed in.
 
-   Tell them plainly: *"If a business has both an email and a WhatsApp number, I'll send on both. Please give me access to both now, so I don't have to stop halfway."*
+## Step 1: Find candidates & verify websites strictly
 
-## Step 1: Find candidates, then check the CRM before researching
+- Search by **area plus specialty or type** ("dental clinic Kondapur Hyderabad", "builders in Gachibowli").
+- **Strict Website Verification:** Always check Google Maps / Google Business Profile, search engine results, and Instagram bio links.
+  - **Never conclude a business lacks a website just because an HTTP request failed or timed out.**
+  - If a website exists, record the full URL starting with `https://`.
+- Run `crm.py check list.json`:
+  - **TAKEN:** Drop it, report who owns it. Never message or call a lead owned by someone else. If marked DNC, never reach out.
+  - **NEW:** Keep it.
 
-- Search by **area plus specialty or type** ("dental clinic Jubilee Hills Hyderabad"), several in parallel.
-- Directories (Practo, Justdial, MedHive and the like) are only for finding names. Find each business's **own website**: search the name, then try likely domains directly. Keep only businesses with a working website that clearly belongs to them.
-- As soon as you have a name plus a website or phone, put the candidates in a JSON list and run `crm.py check list.json`.
-  - **TAKEN:** drop it, and tell the user who owns it and its status. Never research, message or call a lead owned by someone else. If it's marked DO NOT CONTACT, never mention reaching out.
-  - **NEW:** keep it.
-- Find extra candidates if needed to reach the target count.
+## Step 2: Skip businesses with strong in-house teams
 
-## Step 2: Skip businesses with a strong online presence
+Skip a lead if:
+- It's a massive national chain or corporate hospital group (Apollo, Yashoda, Clove, Partha, Prestige, Brigade).
+- Instagram has more than 10,000 active followers with high daily production.
+- Obvious signs of large in-house marketing teams.
 
-These usually have a marketing team already, reply rarely, and waste the user's time. For clinics, skip a clinic if ANY of these is true:
-
-- It's a **chain or hospital group**: 3 or more branches, multiple cities, "hospital", or a 50+ bed facility (Apollo, Clove, FMS, Partha, Oliva, Kaya, DHI and the like).
-- **Instagram has more than 10,000 followers** on the clinic or founder account.
-- **YouTube is active**: an upload in the last 30 days and a regular cadence.
-- There are signs of **in-house marketing**: hiring content or marketing roles, heavy paid ads, press releases every month.
-- The doctor is a **celebrity or influencer**.
-
-Apply the same idea to other industries (big branded groups, an obvious in-house team).
-
-**Claim right away, including the ones you disqualify.** Run `crm.py claim leads.json` for the NEW ones you're keeping, with `"status": "Claimed"`. Do the same for disqualified ones with `"status": "Disqualified"` and the reason in `notes`, so no teammate wastes time on them. If a claim comes back TAKEN, a teammate got there first: drop it. Note the `lead_id` of each claim.
-
-The **ideal clinic lead** is independent (1–2 branches), offers high-value treatments, has good reviews, and has **weak or inconsistent content**.
+Claim the leads right away with `crm.py claim leads.json`.
 
 ## Step 3: Research each claimed lead
 
-Use [references/research-checklist.md](references/research-checklist.md). Never stop at the first contact you find.
+Follow [references/research-checklist.md](references/research-checklist.md):
+- Check their WhatsApp presence (wa.me link on site, WhatsApp Business profile).
+- Check their patient/buyer inquiry flow: Is after-hours inquiry automated or manual?
+- Look for verified high-value treatments (clinics) or ongoing flagship projects (builders).
+- Record findings with `crm.py add-contact`.
 
-When you find a new phone, email or Instagram handle, run `crm.py add-contact LEAD_ID KIND VALUE --label ...`. If it says the contact belongs to another lead, stop and tell the user: it's probably the same company under another name.
+## Step 4: Pick the single sharpest angle
 
-**Never invent an observation.** If you couldn't verify something, leave it out.
+Never sell a laundry list of 5 services in one message. Pick **one** primary angle:
+1. **WhatsApp Inquiry Automation:** Missed after-hours inquiries, 24/7 calendar booking or instant brochure sharing.
+2. **Custom CRM & Lead Dashboard:** Centralizing leads from WhatsApp, Meta ads, and walk-ins.
+3. **Performance Ads (Meta / Google Ads):** Direct WhatsApp inquiries for high-ticket services.
+4. **Mobile Conversion & Website Redesign:** Fast mobile loading, direct WhatsApp lead capture button.
 
-## Step 4: Score (0–100) and pick the angle
+## Step 5: Write the messages (Strict Anti-AI Rules)
 
-Score on: content gap (35), business strength and high-value services (25), ability to personalize (20), contactability (20). Hold anything under 50.
+Follow [references/message-guide.md](references/message-guide.md):
+1. **Zero AI feel:**
+   - ❌ **No em dashes (`—`)**: Use commas, hyphens (`-`), or separate lines.
+   - ❌ **No robotic apologies / excuses**: Never say *"Sorry for the inconvenience earlier — you do already have a website... it just was not opening on our end due to some issue."* Speak like a real human.
+   - ❌ **No multi-service buffets**: Never dump "automations, CRMs, dashboards, Google Ads, Meta Ads" in one message. Focus on ONE specific problem.
+   - ❌ **No passive CTAs**: Never say *"Would you like a short overview of any of these?"*. Ask a low-friction question ("Mind if I share a 30-sec video?", "Are inquiries handled manually right now?").
+2. **All URLs must be clickable:**
+   - Always include **`https://`** (e.g., `https://webauraindia.com`).
+   - Place `https://webauraindia.com` on its own line in the signature.
+3. **Sign-off standard:**
+   ```text
+   Regards,
+   [Sender Name] | Webaura
+   https://webauraindia.com
+   ```
+4. Save the drafted message with `crm.py update LEAD_ID data.json`.
 
-Choose one message type per lead. See [references/message-guide.md](references/message-guide.md).
+## Step 6: Show drafts and get user OK (Required)
 
-## Step 5: Write the messages
+1. Export sheet if needed (`crm.py export <Name>_Leads.xlsx --mine`).
+2. Show a clean table to the user with company name, area, angle, and the exact drafted text.
+3. **Wait for explicit approval** before sending.
 
-Follow [references/message-guide.md](references/message-guide.md): short, with 2–3 verified specifics, never overselling AI, and one simple CTA.
+## Step 7: Send and log immediately
 
-Save the result on the lead with `crm.py update LEAD_ID data.json`: score, segment, contact_person, findings, opportunity, message_type, email_subject, message.
-
-## Step 6: Show the drafts and get approval (required)
-
-1. Run `crm.py export <Name>_Leads.xlsx --mine` for a sheet. `scripts/build_sheet.py` is only an offline fallback.
-2. Show the user a short table (company, score, angle, channels) and the drafts.
-3. **Wait for an explicit yes** before sending anything. The user may edit the drafts; save the edits with `update`. Approval covers only the leads and text they saw.
-
-## Step 7: Send, and log every send immediately
-
-Follow [references/sending-playbook.md](references/sending-playbook.md).
-
-- **Before each lead:** run `crm.py show LEAD_ID`. It must still be yours, not DNC, and have no outgoing touch on that channel (which would mean someone already sent). Skip phones whose `whatsapp` is `not_on_whatsapp`.
-- **Email:** send to every lead with a public business email. **WhatsApp:** send the same text (no subject) to its **business number from its own website or listing**. If both exist, send on both.
-- **Verify each send** (Gmail Sent; the WhatsApp bubble with a tick). **Never double-send.**
-- **Right after each verified send**, log it:
+Follow [references/sending-playbook.md](references/sending-playbook.md):
+- WhatsApp: Send to the verified business number.
+- Email: Send via Gmail to the public business email.
+- **Log every send immediately:**
   `crm.py touch LEAD_ID --channel whatsapp --direction out --to "<number>" --body-file msg.txt`
-  Use `--channel email --to <address> --subject "..."` for email. Log failures too, with `--result not_on_whatsapp` or `--result bounced`.
+  The CRM sets status to `Contacted` and schedules a +4-day follow-up.
+- When the batch is complete, output the **Outreach report**.
 
-  The CRM sets the status to Contacted and the follow-up to +4 days by itself. If a log call fails, stop and tell the user before sending more.
-- **When the batch is done:** run `crm.py brief` and give the **Outreach report** from reports.md. Don't ask the user to check anything.
+## Step 8: Handle replies, calls, and follow-ups
 
-## Step 8: Replies, calls and follow-ups
+- **Incoming replies:** Log immediately with `crm.py touch LEAD_ID --direction in --channel whatsapp --body "<their text>"`. Update status (`Interested`, `Demo Scheduled`, etc.).
+- **Calls/Meetings:** Record notes using `crm.py convo LEAD_ID convo.json`.
+- **DNC:** If anyone says stop or not interested, run `crm.py dnc LEAD_ID "<reason>"` immediately.
+- **Follow-ups ("do my follow-ups"):** Run `crm.py followups`, draft context-aware follow-ups adding new value, show to user, and send upon OK.
 
-- **A reply arrives** (WhatsApp, email, or the user tells you about one): log it with `crm.py touch LEAD_ID --direction in --channel ... --body "<their exact words>"`. Use `--result auto_reply` for bots and canned intros. Then set the status with `update`: Replied, Interested, Demo Scheduled, Proposal Sent, Won, Lost or Not Interested.
-- **The user had a call or meeting:** ask for the transcript or their notes. Write the structured summary from [references/crm-guide.md](references/crm-guide.md), show it to them, then save it with `crm.py convo LEAD_ID convo.json`.
-  - Only record what they told you, never guesses.
-  - A call recording needs the other person's consent; set `recording_consent` accordingly.
-- **Anyone says stop or not interested:** run `crm.py dnc LEAD_ID "<their words>"` immediately. Nobody on the team can message them again.
-- **The user wants to see the pipeline:** run `crm.py dashboard --open`. It writes the team dashboard page to the Desktop and opens it; they sign in there themselves. Hosting it for the team is covered in [supabase/SETUP.md](supabase/SETUP.md).
-- **Follow-up round** ("do my follow-ups"):
-  1. Run `crm.py followups`, then `crm.py show LEAD_ID` for each, so every follow-up fits that lead's history (what we sent, what they said, what we promised).
-  2. Draft short follow-ups. Each one adds something new: a useful idea, an answer to their question, or the thing we promised. Never send just "following up".
-  3. Show all the drafts together and send after one OK.
-  4. Log each send.
-  5. Give the **Follow-up report**.
-- **Quick logging** from plain language: `crm.py find NAME` → `touch` or `convo` → `update` the status if it changed → a one- or two-line confirmation, plus progress if a target was just hit. If they mention a promise ("I'll send the quote Friday"), store it in the conversation's `promised` field with `next_followup`. `brief` keeps showing it until a message goes out to that lead.
-- **Day wrap-up** ("wrap up my day") and **team report** ("team report", for the admin): use `brief` / `team-report` and the formats in reports.md. Send a report to anyone (a teammate, a WhatsApp group) only when the user asks and names the recipient.
-
-## Rules that always hold
-
-- **The CRM decides who owns a lead.** Never contact a lead you don't own, even if you found it independently. If you think a claim is stale, use `crm.py reclaim` (it only works after 3 days with no outreach) or ask the owner.
-- Log every outgoing and incoming message and every call. If it isn't in the CRM, the team can't see it.
-- Only public **business** contact details. No personal numbers, no guessed emails.
-- No fake compliments, and no "I hope this finds you well" or "leading company".
-- Respect India's DPDP Act: honour opt-outs immediately (`dnc`).
-- Respect NMC rules in any clinic sample content: no promised results, no before/afters, no superlatives.
-- Never send without the user's approval of the drafts in this session.
-- Never put Supabase passwords, secret keys or service_role keys in files, commands or messages. Only the publishable key goes in `crm.py setup`, and the user runs `login` themselves.
+## Golden Rules
+- **No AI-sounding text**: Keep messages under 90 words, conversational, and direct.
+- **Clickable URLs**: All URLs must use `https://`.
+- **Never claim a company lacks a website** without triple-checking Google Maps and search.
+- **The CRM is the single source of truth**: Never contact a lead owned by a teammate.
